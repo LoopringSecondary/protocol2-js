@@ -7,7 +7,7 @@ import { ExchangeDeserializer } from "./exchange_deserializer";
 import { Mining } from "./mining";
 import { OrderUtil } from "./order";
 import { Ring } from "./ring";
-import { OrderInfo, RingMinedEvent, RingsInfo, SimulatorReport, Spendable,
+import { OrderInfo, RingMinedEvent, RingsInfo, SimulatorReport, Spendable, TokenType,
          TransactionPayments, TransferItem } from "./types";
 import { xor } from "./xor";
 
@@ -248,30 +248,32 @@ export class ProtocolSimulator {
       }
       if (!balancesBefore[order.tokenS][order.owner]) {
         balancesBefore[order.tokenS][order.owner] =
-          await this.orderUtil.getERC20Spendable(this.context.tradeDelegate.address,
-                                                  order.tokenS,
-                                                  order.owner);
+          await this.orderUtil.getTokenSpendable(order.tokenTypeS,
+                                                 order.tokenS,
+                                                 order.trancheS,
+                                                 order.owner);
       }
       if (!balancesBefore[order.tokenB][order.tokenRecipient]) {
         balancesBefore[order.tokenB][order.tokenRecipient] =
-          await this.orderUtil.getERC20Spendable(this.context.tradeDelegate.address,
+          await this.orderUtil.getTokenSpendable(order.tokenTypeB,
                                                  order.tokenB,
+                                                 order.trancheB,
                                                  order.tokenRecipient);
       }
       if (!balancesBefore[order.feeToken][order.owner]) {
         balancesBefore[order.feeToken][order.owner] =
-          await this.orderUtil.getERC20Spendable(this.context.tradeDelegate.address,
+          await this.orderUtil.getTokenSpendable(order.tokenTypeFee,
                                                  order.feeToken,
+                                                 undefined,
                                                  order.owner);
       }
     }
     for (const order of orders) {
-      const tokens = [order.tokenS, order.tokenB, order.feeToken];
-      for (const token of tokens) {
+      if (order.tokenTypeS === TokenType.ERC20) {
         const Token = this.context.ERC20Contract.at(order.tokenS);
         // feeRecipient
-        if (!balancesBefore[token][mining.feeRecipient]) {
-          balancesBefore[token][mining.feeRecipient] = await Token.balanceOf(mining.feeRecipient);
+        if (!balancesBefore[order.tokenS][mining.feeRecipient]) {
+          balancesBefore[order.tokenS][mining.feeRecipient] = await Token.balanceOf(mining.feeRecipient);
         }
       }
     }

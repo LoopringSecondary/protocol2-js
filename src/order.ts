@@ -4,7 +4,7 @@ import ABI = require("ethereumjs-abi");
 import { Context } from "./context";
 import { ensure } from "./ensure";
 import { MultiHashUtil } from "./multihash";
-import { OrderInfo, Spendable } from "./types";
+import { OrderInfo, Spendable, TokenType } from "./types";
 
 export class OrderUtil {
 
@@ -36,11 +36,15 @@ export class OrderUtil {
     valid = valid && ensure(order.tokenB ? true : false, "invalid order tokenB");
     valid = valid && ensure(order.amountS !== 0, "invalid order amountS");
     valid = valid && ensure(order.amountB !== 0, "invalid order amountB");
+    valid = valid && ensure(order.feeToken !== undefined, "invalid feeToken");
+    valid = valid && ensure(order.tokenTypeFee !== TokenType.ERC1400, "feeToken cannot be a security token"),
     valid = valid && ensure(order.feePercentage < this.context.feePercentageBase, "invalid fee percentage");
     valid = valid && ensure(order.waiveFeePercentage <= this.context.feePercentageBase, "invalid waive percentage");
     valid = valid && ensure(order.waiveFeePercentage >= -this.context.feePercentageBase, "invalid waive percentage");
     valid = valid && ensure(order.tokenSFeePercentage < this.context.feePercentageBase, "invalid tokenS percentage");
+    valid = valid && ensure(!(order.tokenSFeePercentage > 0 && order.tokenTypeS === TokenType.ERC1400), "ERC1400 fee");
     valid = valid && ensure(order.tokenBFeePercentage < this.context.feePercentageBase, "invalid tokenB percentage");
+    valid = valid && ensure(!(order.tokenBFeePercentage > 0 && order.tokenTypeB === TokenType.ERC1400), "ERC1400 fee");
     valid = valid && ensure(order.walletSplitPercentage <= 100, "invalid wallet split percentage");
     if (order.dualAuthAddr) {
       valid = valid && ensure(order.dualAuthSig && order.dualAuthSig.length > 0, "missing dual author signature");
@@ -180,7 +184,9 @@ export class OrderUtil {
   }
 
   public async getSpendableS(order: OrderInfo) {
-    const spendable = await this.getSpendable(order.tokenS,
+    const spendable = await this.getSpendable(order.tokenTypeS,
+                                              order.trancheS,
+                                              order.tokenS,
                                               order.owner,
                                               order.broker,
                                               order.brokerInterceptor,
@@ -190,7 +196,9 @@ export class OrderUtil {
   }
 
   public async getSpendableFee(order: OrderInfo) {
-    const spendable = await this.getSpendable(order.feeToken,
+    const spendable = await this.getSpendable(order.tokenTypeFee,
+                                              "0x0",
+                                              order.feeToken,
                                               order.owner,
                                               order.broker,
                                               order.brokerInterceptor,
@@ -237,6 +245,34 @@ export class OrderUtil {
     return spendable;
   }
 
+  public async getERC1400Spendable(spender: string,
+                                   tokenAddress: string,
+                                   tranche: string,
+                                   owner: string) {
+    const token = this.context.ERC1400Contract.at(tokenAddress);
+    let isOperator = await token.isOperatorFor(spender, owner);
+    if (!isOperator) {
+      isOperator = await token.isOperatorForTranche(tranche, spender, owner);
+    }
+    if (isOperator) {
+        const balance = await token.balanceOfTranche(tranche, owner);
+        return balance;
+    } else {
+        return new BigNumber(0);
+    }
+  }
+
+  public async getTokenSpendable(tokenType: TokenType,
+                                 token: string,
+                                 tranche: string,
+                                 owner: string) {
+    if (tokenType === TokenType.ERC20) {
+      return await this.getERC20Spendable(this.context.tradeDelegate.address, token, owner);
+    } else if (tokenType === TokenType.ERC1400) {
+      return await this.getERC1400Spendable(this.context.tradeDelegate.address, token, tranche, owner);
+    }
+  }
+
   public async getBrokerAllowance(tokenAddr: string,
                                   owner: string,
                                   broker: string,
@@ -252,16 +288,26 @@ export class OrderUtil {
     }
   }
 
-  private async getSpendable(token: string,
+  private async getSpendable(tokenType: TokenType,
+                             tranche: string,
+                             token: string,
                              owner: string,
                              broker: string,
                              brokerInterceptor: string,
                              tokenSpendable: Spendable,
                              brokerSpendable: Spendable) {
     if (!tokenSpendable.initialized) {
-      tokenSpendable.amount = await this.getERC20Spendable(this.context.tradeDelegate.address,
-                                                           token,
-                                                           owner);
+      if (tokenType === TokenType.ERC20) {
+        tokenSpendable.amount = await this.getERC20Spendable(this.context.tradeDelegate.address,
+                                                             token,
+                                                             owner);
+      } else if (tokenType === TokenType.ERC1400) {
+        console.log("getSpendable: ");
+        tokenSpendable.amount = await this.getERC1400Spendable(this.context.tradeDelegate.address,
+                                                               token,
+                                                               tranche,
+                                                               owner);
+      }
       tokenSpendable.initialized = true;
       // Testing
       tokenSpendable.initialAmount = tokenSpendable.amount;

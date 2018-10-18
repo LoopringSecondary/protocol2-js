@@ -11,6 +11,11 @@ export enum SignAlgorithm {
   None = 255,     // Do not sign
 }
 
+export enum TokenType {
+  ERC20 = 0,
+  ERC1400 = 1,
+}
+
 export interface Spendable {
   initialized?: boolean;
   amount?: BigNumber;
@@ -53,6 +58,13 @@ export interface OrderInfo {
   tokenBFeePercentage?: number;     // spec value 1 << 13
   tokenRecipient?: string;          // spec value 1 << 14
   walletSplitPercentage?: number;   // spec value 1 << 15
+
+  tokenTypeS?: TokenType;
+  tokenTypeB?: TokenType;
+  tokenTypeFee?: TokenType;
+  trancheS?: string;
+  trancheB?: string;
+  transferDataS?: string;
 
   // helper field
   P2P?: boolean;
@@ -170,6 +182,11 @@ export interface TransferItem {
   from: string;
   to: string;
   amount: BigNumber;
+
+  // ERC1400
+  fromTranche?: string;
+  toTranche?: string;
+  data?: string;
 }
 
 export interface RingMinedEvent {

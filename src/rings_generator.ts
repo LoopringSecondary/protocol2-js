@@ -300,6 +300,13 @@ export class RingsGenerator {
     }
 
     param.tables.addNumber(order.walletSplitPercentage ? order.walletSplitPercentage : 0, 2);
+
+    param.tables.addNumber(order.tokenTypeS, 2);
+    param.tables.addNumber(order.tokenTypeB, 2);
+    param.tables.addNumber(order.tokenTypeFee, 2);
+
+    this.insertOffset(param, param.data.addHex(order.trancheS, false));
+    this.insertOffset(param, param.data.addHex(order.trancheB, false));
   }
 
   private xor(s1: string, s2: string, numBytes: number) {

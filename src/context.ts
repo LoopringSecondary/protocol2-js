@@ -9,6 +9,7 @@ export class Context {
   public feePercentageBase: number;
 
   public ERC20Contract: any;
+  public ERC1400Contract: any;
   public TradeDelegateContract: any;
   public BrokerRegistryContract: any;
   public OrderRegistryContract: any;
@@ -43,6 +44,7 @@ export class Context {
 
     const ABIPath = "ABI/latest/";
     const erc20Abi = fs.readFileSync(ABIPath + "ERC20.abi", "ascii");
+    const erc1400Abi = fs.readFileSync(ABIPath + "ERC1400.abi", "ascii");
     const tradeDelegateAbi = fs.readFileSync(ABIPath + "ITradeDelegate.abi", "ascii");
     const brokerRegistryAbi = fs.readFileSync(ABIPath + "IBrokerRegistry.abi", "ascii");
     const orderRegistryAbi = fs.readFileSync(ABIPath + "IOrderRegistry.abi", "ascii");
@@ -56,6 +58,7 @@ export class Context {
     }
 
     this.ERC20Contract = web3.eth.contract(JSON.parse(erc20Abi));
+    this.ERC1400Contract = web3.eth.contract(JSON.parse(erc1400Abi));
     this.TradeDelegateContract = web3.eth.contract(JSON.parse(tradeDelegateAbi));
     this.BrokerRegistryContract = web3.eth.contract(JSON.parse(brokerRegistryAbi));
     this.OrderRegistryContract = web3.eth.contract(JSON.parse(orderRegistryAbi));

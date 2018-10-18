@@ -2,7 +2,7 @@ import { BigNumber } from "bignumber.js";
 import { Context } from "./context";
 import { logDebug } from "./logs";
 import { OrderUtil } from "./order";
-import { OrderExpectation, OrderInfo, RingsInfo, SimulatorReport } from "./types";
+import { OrderExpectation, OrderInfo, RingsInfo, SimulatorReport, TokenType } from "./types";
 
 interface OrderSettlement {
   amountS: BigNumber;
@@ -118,8 +118,10 @@ export class ProtocolValidator {
           expectedBalances[order.feeToken][order.owner].minus(totalFee);
 
         // Add margin given to the feeRecipient
-        expectedBalances[order.tokenS][feeRecipient] =
-          expectedBalances[order.tokenS][feeRecipient].plus(orderSettlement.splitS);
+        if (order.tokenTypeS !== TokenType.ERC1400) {
+          expectedBalances[order.tokenS][feeRecipient] =
+            expectedBalances[order.tokenS][feeRecipient].plus(orderSettlement.splitS);
+        }
 
         // Filled
         const expectedFilledAmount = new BigNumber(order.amountS)

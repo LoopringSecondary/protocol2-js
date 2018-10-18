@@ -39,7 +39,7 @@ export class ExchangeDeserializer {
     // Calculate data pointers
     const miningDataPtr = 8;
     const orderDataPtr = miningDataPtr + 3 * 2;
-    const ringDataPtr = orderDataPtr + (25 * numOrders) * 2;
+    const ringDataPtr = orderDataPtr + (30 * numOrders) * 2;
     const dataBlobPtr = ringDataPtr + (numRings * 9) + 32;
 
     this.spendableList = [];
@@ -112,6 +112,11 @@ export class ExchangeDeserializer {
       tokenBFeePercentage: this.nextUint16(),
       tokenRecipient: this.nextAddress(),
       walletSplitPercentage: this.nextUint16(),
+      tokenTypeS: this.nextUint16(),
+      tokenTypeB: this.nextUint16(),
+      tokenTypeFee: this.nextUint16(),
+      trancheS: this.nextBytes32(),
+      trancheB: this.nextBytes32(),
     };
     order.feeToken = order.feeToken ? order.feeToken : this.context.lrcAddress;
     order.tokenRecipient = order.tokenRecipient ? order.tokenRecipient : order.owner;
@@ -186,6 +191,16 @@ export class ExchangeDeserializer {
       return data;
     } else {
       return undefined;
+    }
+  }
+
+  private nextBytes32() {
+    const offset = this.getNextOffset() * 4;
+    if (offset !== 0) {
+      const data = "0x" + this.data.extractBytesX(this.dataOffset + offset, 32).toString("hex");
+      return data;
+    } else {
+      return "0x" + "0".repeat(64);
     }
   }
 

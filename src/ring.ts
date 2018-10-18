@@ -6,7 +6,8 @@ import { ensure } from "./ensure";
 import { logDebug } from "./logs";
 import { Mining } from "./mining";
 import { OrderUtil } from "./order";
-import { DetailedTokenTransfer, OrderInfo, OrderPayments, Participation, RingPayments, TransferItem } from "./types";
+import { DetailedTokenTransfer, OrderInfo, OrderPayments, Participation, RingPayments,
+         TokenType, TransferItem } from "./types";
 
 export class Ring {
 
@@ -165,8 +166,23 @@ export class Ring {
     for (let i = 0; i < ringSize; i++) {
       const prevIndex = (i + ringSize - 1) % ringSize;
 
+      // Check if we can transfer the tokens
+      if (this.participations[i].order.tokenTypeS === TokenType.ERC1400) {
+        const ERC1400token = this.context.ERC1400Contract.at(this.participations[i].order.tokenS);
+        const [ESC, unused, destTranche] = await ERC1400token.canSend(
+            this.participations[i].order.owner,
+            this.participations[prevIndex].order.tokenRecipient,
+            this.participations[i].order.trancheS,
+            this.participations[i].fillAmountS,
+            this.participations[i].order.transferDataS ? this.participations[i].order.transferDataS : "0x0",
+        );
+        this.valid = this.valid && ensure(ESC === "0x01", "canSend is false");
+        this.valid = this.valid &&
+                     ensure(destTranche === this.participations[prevIndex].order.trancheB, "wrong dest tranche");
+      }
+
       const valid = await this.calculateFees(this.participations[i], this.participations[prevIndex]);
-      this.valid = ensure(valid, "ring cannot be settled");
+      this.valid = this.valid && ensure(valid, "ring cannot be settled");
       if (this.participations[i].order.waiveFeePercentage < 0) {
         this.minerFeesToOrdersPercentage += -this.participations[i].order.waiveFeePercentage;
       }
@@ -212,9 +228,16 @@ export class Ring {
       // We have to pay with tokenB if the owner can't pay the complete feeAmount in feeToken
       p.ringSpendableFee = await this.orderUtil.getSpendableFee(p.order);
       if (p.feeAmount.gt(p.ringSpendableFee)) {
+        // Never use a security token to pay fees.
+        if (p.order.tokenTypeB === TokenType.ERC1400) {
+            // Pay the available fee balance
+            p.feeAmount = p.ringSpendableFee;
+            await this.orderUtil.reserveAmountFee(p.order, p.feeAmount);
+        } else {
           p.feeAmountB = p.feeAmountB.plus(p.fillAmountB.times(p.order.feePercentage)
                                            .dividedToIntegerBy(this.context.feePercentageBase));
           p.feeAmount = new BigNumber(0);
+        }
       } else {
         await this.orderUtil.reserveAmountFee(p.order, p.feeAmount);
       }
@@ -310,17 +333,51 @@ export class Ring {
         amountFeeToFeeHolder = new BigNumber(0);
       }
 
-      this.addTokenTransfer(transferItems, p.order.tokenS, p.order.owner, prevP.order.tokenRecipient, amountSToBuyer);
-      this.addTokenTransfer(transferItems, p.order.tokenS, p.order.owner, feeHolder, amountSToFeeHolder);
-      this.addTokenTransfer(transferItems, p.order.feeToken, p.order.owner, feeHolder, amountFeeToFeeHolder);
-      this.addTokenTransfer(transferItems, p.order.tokenS, p.order.owner, mining.feeRecipient, p.splitS);
+      let margin = p.splitS;
+      // Don't pay out the margin to the miner if it's a security token
+      if (p.order.tokenTypeS === TokenType.ERC1400) {
+          margin = new BigNumber(0);
+      }
+
+      this.addTokenTransfer(transferItems,
+                            p.order.tokenTypeS,
+                            p.order.trancheS,
+                            p.order.tokenS,
+                            p.order.owner,
+                            prevP.order.tokenRecipient,
+                            amountSToBuyer,
+                            p.order.transferDataS);
+      this.addTokenTransfer(transferItems,
+                            p.order.tokenTypeS,
+                            p.order.trancheS,
+                            p.order.tokenS,
+                            p.order.owner,
+                            feeHolder,
+                            amountSToFeeHolder,
+                            p.order.transferDataS);
+      this.addTokenTransfer(transferItems,
+                            p.order.tokenTypeFee,
+                            p.order.trancheFee,
+                            p.order.feeToken,
+                            p.order.owner,
+                            feeHolder,
+                            amountFeeToFeeHolder,
+                            undefined);
+      this.addTokenTransfer(transferItems,
+                            p.order.tokenTypeS,
+                            p.order.trancheS,
+                            p.order.tokenS,
+                            p.order.owner,
+                            mining.feeRecipient,
+                            margin,
+                            p.order.transferDataS);
 
       // BEGIN diagnostics
-      this.detailTransferS[i].amount = p.fillAmountS.plus(p.splitS).toNumber();
+      this.detailTransferS[i].amount = p.fillAmountS.plus(margin).toNumber();
       this.logPayment(this.detailTransferS[i], p.order.tokenS, p.order.owner, prevP.order.tokenRecipient,
                       p.fillAmountS.minus(p.feeAmountS), "ToBuyer");
       this.logPayment(this.detailTransferS[i], p.order.tokenS, p.order.owner, mining.feeRecipient,
-                      p.splitS, "Margin");
+                      margin, "Margin");
       this.detailTransferB[i].amount = p.fillAmountB.toNumber();
       this.detailTransferFee[i].amount = p.feeAmount.toNumber();
       // END diagnostics
@@ -328,9 +385,20 @@ export class Ring {
     return transferItems;
   }
 
-  private addTokenTransfer(transferItems: TransferItem[], token: string, from: string, to: string, amount: BigNumber) {
+  private addTokenTransfer(transferItems: TransferItem[],
+                           tokenType: TokenType,
+                           fromTranche: string,
+                           token: string,
+                           from: string,
+                           to: string,
+                           amount: BigNumber,
+                           data: string) {
     if (from !== to && amount.gt(0)) {
-      transferItems.push({token, from, to, amount});
+      if (tokenType === TokenType.ERC20) {
+        transferItems.push({token, from, to, amount});
+      } else if (tokenType === TokenType.ERC1400) {
+        transferItems.push({token, from, to, amount, fromTranche, toTranche: fromTranche, data: data ? data : "0x"});
+      }
     }
   }
 
