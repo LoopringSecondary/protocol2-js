@@ -39,7 +39,7 @@ export class ExchangeDeserializer {
     // Calculate data pointers
     const miningDataPtr = 8;
     const orderDataPtr = miningDataPtr + 3 * 2;
-    const ringDataPtr = orderDataPtr + (30 * numOrders) * 2;
+    const ringDataPtr = orderDataPtr + (31 * numOrders) * 2;
     const dataBlobPtr = ringDataPtr + (numRings * 9) + 32;
 
     this.spendableList = [];
@@ -117,6 +117,7 @@ export class ExchangeDeserializer {
       tokenTypeFee: this.nextUint16(),
       trancheS: this.nextBytes32(),
       trancheB: this.nextBytes32(),
+      transferDataS: this.nextBytes(),
     };
     order.feeToken = order.feeToken ? order.feeToken : this.context.lrcAddress;
     order.tokenRecipient = order.tokenRecipient ? order.tokenRecipient : order.owner;

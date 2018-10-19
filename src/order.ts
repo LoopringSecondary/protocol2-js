@@ -84,6 +84,9 @@ export class OrderUtil {
   }
 
   public getOrderHash(order: OrderInfo) {
+    const transferDataSBuffer = new Buffer(order.transferDataS ? order.transferDataS.slice(2) : "", "hex");
+    const transferDataSHash = ABI.soliditySHA3([ "bytes" ], [ transferDataSBuffer ]);
+
     const args = [
       this.toBN(order.amountS),
       this.toBN(order.amountB),
@@ -104,6 +107,9 @@ export class OrderUtil {
       this.toBN(order.tokenSFeePercentage),
       this.toBN(order.tokenBFeePercentage),
       order.allOrNone,
+      order.trancheS ? order.trancheS : "0x0",
+      order.trancheB ? order.trancheB : "0x0",
+      transferDataSHash,
     ];
     const argTypes = [
       "uint256",
@@ -125,6 +131,9 @@ export class OrderUtil {
       "uint16",
       "uint16",
       "bool",
+      "bytes32",
+      "bytes32",
+      "bytes32",
     ];
     const orderHash = ABI.soliditySHA3(argTypes, args);
     return orderHash;
@@ -302,7 +311,6 @@ export class OrderUtil {
                                                              token,
                                                              owner);
       } else if (tokenType === TokenType.ERC1400) {
-        console.log("getSpendable: ");
         tokenSpendable.amount = await this.getERC1400Spendable(this.context.tradeDelegate.address,
                                                                token,
                                                                tranche,

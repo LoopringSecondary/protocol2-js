@@ -307,6 +307,13 @@ export class RingsGenerator {
 
     this.insertOffset(param, param.data.addHex(order.trancheS, false));
     this.insertOffset(param, param.data.addHex(order.trancheB, false));
+
+    if (order.transferDataS) {
+      this.insertOffset(param, param.data.addHex(this.createBytes(order.transferDataS), false));
+      this.addPadding(param);
+    } else {
+      this.insertDefault(param);
+    }
   }
 
   private xor(s1: string, s2: string, numBytes: number) {
