@@ -254,6 +254,7 @@ export class OrderUtil {
                                    tokenAddress: string,
                                    tranche: string,
                                    owner: string) {
+    tranche = tranche ? tranche : "0x0";
     const token = this.context.ERC1400Contract.at(tokenAddress);
     let isOperator = await token.isOperatorFor(spender, owner);
     if (!isOperator) {
