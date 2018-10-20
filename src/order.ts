@@ -38,7 +38,6 @@ export class OrderUtil {
     valid = valid && ensure(order.amountB !== 0, "invalid order amountB");
     valid = valid && ensure(order.feeToken !== undefined, "invalid feeToken");
     valid = valid && ensure(order.tokenTypeFee !== TokenType.ERC1400, "feeToken cannot be a security token"),
-    valid = valid && ensure(order.feePercentage < this.context.feePercentageBase, "invalid fee percentage");
     valid = valid && ensure(order.waiveFeePercentage <= this.context.feePercentageBase, "invalid waive percentage");
     valid = valid && ensure(order.waiveFeePercentage >= -this.context.feePercentageBase, "invalid waive percentage");
     valid = valid && ensure(order.tokenSFeePercentage < this.context.feePercentageBase, "invalid tokenS percentage");
@@ -103,7 +102,6 @@ export class OrderUtil {
       order.tokenRecipient,
       order.feeToken,
       order.walletSplitPercentage,
-      this.toBN(order.feePercentage),
       this.toBN(order.tokenSFeePercentage),
       this.toBN(order.tokenBFeePercentage),
       order.allOrNone,
@@ -126,7 +124,6 @@ export class OrderUtil {
       "address",
       "address",
       "address",
-      "uint16",
       "uint16",
       "uint16",
       "uint16",
@@ -173,7 +170,6 @@ export class OrderUtil {
     bytes32Array.push(numberToBytes32Str(orderInfo.validUntil));
     bytes32Array.push(addressToBytes32Str(orderInfo.feeToken));
     bytes32Array.push(numberToBytes32Str(orderInfo.feeAmount));
-    bytes32Array.push(numberToBytes32Str(orderInfo.feePercentage));
     bytes32Array.push(numberToBytes32Str(orderInfo.tokenSFeePercentage));
     bytes32Array.push(numberToBytes32Str(orderInfo.tokenBFeePercentage));
     bytes32Array.push(addressToBytes32Str(orderInfo.tokenRecipient));
