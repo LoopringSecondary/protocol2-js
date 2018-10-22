@@ -405,9 +405,10 @@ export class Ring {
                            to: string,
                            amount: BigNumber,
                            data: string) {
+    const zeroAddress = "0x" + "0".repeat(64);
     if (from !== to && amount.gt(0)) {
       if (tokenType === TokenType.ERC20) {
-        transferItems.push({token, from, to, amount});
+        transferItems.push({token, from, to, amount, fromTranche: zeroAddress, toTranche: zeroAddress});
       } else if (tokenType === TokenType.ERC1400) {
         transferItems.push({token, from, to, amount, fromTranche, toTranche: fromTranche, data: data ? data : "0x"});
       }

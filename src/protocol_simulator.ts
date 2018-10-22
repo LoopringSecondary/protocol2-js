@@ -1,5 +1,6 @@
 import { BigNumber } from "bignumber.js";
 import BN = require("bn.js");
+import { BalanceBook } from "./balance_book";
 import { Bitstream } from "./bitstream";
 import { Context } from "./context";
 import { ensure } from "./ensure";
@@ -122,7 +123,9 @@ export class ProtocolSimulator {
           for (const transferItem of transferItems) {
             if (transferItem.token === ringTransferItem.token &&
                 transferItem.from === ringTransferItem.from &&
-                transferItem.to === ringTransferItem.to) {
+                transferItem.to === ringTransferItem.to &&
+                transferItem.fromTranche === ringTransferItem.fromTranche &&
+                transferItem.data === ringTransferItem.data) {
                 transferItem.amount = transferItem.amount.plus(ringTransferItem.amount);
                 addNew = false;
             }
@@ -233,80 +236,49 @@ export class ProtocolSimulator {
                               feeBalances: { [id: string]: any; },
                               ringMinedEvents: RingMinedEvent[]) {
     const orders = ringsInfo.orders;
+    const zeroAddress = "0x" + "0".repeat(64);
 
     // Collect balances before the transaction
-    const balancesBefore: { [id: string]: any; } = {};
+    const balancesBefore = new BalanceBook();
     for (const order of orders) {
-      if (!balancesBefore[order.tokenS]) {
-        balancesBefore[order.tokenS] = {};
+      if (!balancesBefore.isBalanceKnown(order.owner, order.tokenS, order.trancheS)) {
+        const amount = await this.orderUtil.getTokenSpendable(order.tokenTypeS,
+                                                              order.tokenS,
+                                                              order.trancheS,
+                                                              order.owner);
+        balancesBefore.addBalance(order.owner, order.tokenS, order.trancheS, amount);
       }
-      if (!balancesBefore[order.tokenB]) {
-        balancesBefore[order.tokenB] = {};
+      if (!balancesBefore.isBalanceKnown(order.tokenRecipient, order.tokenB, order.trancheB)) {
+        const amount = await this.orderUtil.getTokenSpendable(order.tokenTypeB,
+                                                              order.tokenB,
+                                                              order.trancheB,
+                                                              order.tokenRecipient);
+        balancesBefore.addBalance(order.tokenRecipient, order.tokenB, order.trancheB, amount);
       }
-      if (!balancesBefore[order.feeToken]) {
-        balancesBefore[order.feeToken] = {};
-      }
-      if (!balancesBefore[order.tokenS][order.owner]) {
-        balancesBefore[order.tokenS][order.owner] =
-          await this.orderUtil.getTokenSpendable(order.tokenTypeS,
-                                                 order.tokenS,
-                                                 order.trancheS,
-                                                 order.owner);
-      }
-      if (!balancesBefore[order.tokenB][order.tokenRecipient]) {
-        balancesBefore[order.tokenB][order.tokenRecipient] =
-          await this.orderUtil.getTokenSpendable(order.tokenTypeB,
-                                                 order.tokenB,
-                                                 order.trancheB,
-                                                 order.tokenRecipient);
-      }
-      if (!balancesBefore[order.feeToken][order.owner]) {
-        balancesBefore[order.feeToken][order.owner] =
-          await this.orderUtil.getTokenSpendable(order.tokenTypeFee,
-                                                 order.feeToken,
-                                                 undefined,
-                                                 order.owner);
+      if (!balancesBefore.isBalanceKnown(order.owner, order.feeToken, zeroAddress)) {
+        const amount = await this.orderUtil.getTokenSpendable(order.tokenTypeFee,
+                                                              order.feeToken,
+                                                              zeroAddress,
+                                                              order.owner);
+        balancesBefore.addBalance(order.owner, order.feeToken, zeroAddress, amount);
       }
     }
     for (const order of orders) {
       if (order.tokenTypeS === TokenType.ERC20) {
         const Token = this.context.ERC20Contract.at(order.tokenS);
         // feeRecipient
-        if (!balancesBefore[order.tokenS][mining.feeRecipient]) {
-          balancesBefore[order.tokenS][mining.feeRecipient] = await Token.balanceOf(mining.feeRecipient);
+        if (!balancesBefore.isBalanceKnown(mining.feeRecipient, order.tokenS, order.trancheS)) {
+          const amount = await Token.balanceOf(mining.feeRecipient);
+          balancesBefore.addBalance(mining.feeRecipient, order.tokenS, order.trancheS, amount);
         }
       }
     }
 
     // Simulate the token transfers of all rings
-    const balanceDeltas: { [id: string]: any; } = {};
+    const balancesAfter = balancesBefore.copy();
     for (const transfer of transferItems) {
-      if (!balanceDeltas[transfer.token]) {
-        balanceDeltas[transfer.token] = {};
-      }
-      if (!balanceDeltas[transfer.token][transfer.from]) {
-        balanceDeltas[transfer.token][transfer.from] = new BigNumber(0);
-      }
-      if (!balanceDeltas[transfer.token][transfer.to]) {
-        balanceDeltas[transfer.token][transfer.to] = new BigNumber(0);
-      }
-      balanceDeltas[transfer.token][transfer.from] =
-        balanceDeltas[transfer.token][transfer.from].minus(transfer.amount);
-      balanceDeltas[transfer.token][transfer.to] =
-        balanceDeltas[transfer.token][transfer.to].plus(transfer.amount);
-    }
-
-    // Calculate the balances after the transaction
-    const balancesAfter: { [id: string]: any; } = {};
-    for (const token of Object.keys(balancesBefore)) {
-      for (const owner of Object.keys(balancesBefore[token])) {
-        if (!balancesAfter[token]) {
-          balancesAfter[token] = {};
-        }
-        const delta = (balanceDeltas[token] && balanceDeltas[token][owner]) ?
-                      balanceDeltas[token][owner] : new BigNumber(0);
-        balancesAfter[token][owner] = balancesBefore[token][owner].plus(delta);
-      }
+      balancesAfter.addBalance(transfer.from, transfer.token, transfer.fromTranche, transfer.amount.neg());
+      balancesAfter.addBalance(transfer.to, transfer.token, transfer.toTranche, transfer.amount);
     }
 
     // Get the fee balances before the transaction
@@ -381,7 +353,7 @@ export class ProtocolSimulator {
       feeBalancesAfter,
       filledAmounts,
       balancesBefore,
-      balancesAfter,
+      balancesAfter: balancesAfter.getData(),
       payments,
     };
     return simulatorReport;
@@ -390,11 +362,14 @@ export class ProtocolSimulator {
   private async validateRings(ringsInfo: RingsInfo,
                               report: SimulatorReport) {
     const orders = ringsInfo.orders;
+    const zeroAddress = "0x" + "0".repeat(64);
 
     // Check if we haven't spent more funds than the owner owns
-    for (const token of Object.keys(report.balancesAfter)) {
-      for (const owner of Object.keys(report.balancesAfter[token])) {
-        assert(report.balancesAfter[token][owner] >= 0, "can't sell more tokens than the owner owns");
+    for (const owner of Object.keys(report.balancesAfter)) {
+      for (const token of Object.keys(report.balancesAfter[owner])) {
+        for (const tranche of Object.keys(report.balancesAfter[owner][token])) {
+          assert(report.balancesAfter[owner][token][tranche].gte(0), "can't sell more tokens than the owner owns");
+        }
       }
     }
 
@@ -403,7 +378,9 @@ export class ProtocolSimulator {
       if (order.tokenSpendableS.initialized) {
         let amountTransferredS = new BigNumber(0);
         for (const transfer of report.transferItems) {
-          if (transfer.from === order.owner && transfer.token === order.tokenS) {
+          if (transfer.from === order.owner &&
+              transfer.token === order.tokenS &&
+              transfer.fromTranche === order.trancheS) {
             amountTransferredS = amountTransferredS.plus(transfer.amount);
           }
         }
@@ -414,7 +391,9 @@ export class ProtocolSimulator {
       if (order.tokenSpendableFee.initialized) {
         let amountTransferredFee = new BigNumber(0);
         for (const transfer of report.transferItems) {
-          if (transfer.from === order.owner && transfer.token === order.feeToken) {
+          if (transfer.from === order.owner &&
+              transfer.token === order.feeToken &&
+              transfer.fromTranche === zeroAddress) {
             amountTransferredFee = amountTransferredFee.plus(transfer.amount);
           }
         }

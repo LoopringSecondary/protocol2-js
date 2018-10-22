@@ -118,8 +118,11 @@ export class ExchangeDeserializer {
       trancheB: this.nextBytes32(),
       transferDataS: this.nextBytes(),
     };
+    const zeroAddress = "0x" + "0".repeat(64);
     order.feeToken = order.feeToken ? order.feeToken : this.context.lrcAddress;
     order.tokenRecipient = order.tokenRecipient ? order.tokenRecipient : order.owner;
+    order.trancheS = order.trancheS ? order.trancheS : zeroAddress;
+    order.trancheB = order.trancheB ? order.trancheB : zeroAddress;
     return order;
   }
 
@@ -215,22 +218,28 @@ export class ExchangeDeserializer {
   }
 
   private validateSpendables(orders: OrderInfo[]) {
+    const zeroAddress = "0x" + "0".repeat(64);
     const ownerSpendables: { [id: string]: any; } = {};
-    const brokerSpendables: { [id: string]: any; } = {};
     for (const order of orders) {
       // Token spendables
       if (!ownerSpendables[order.owner]) {
         ownerSpendables[order.owner] = {};
       }
       if (!ownerSpendables[order.owner][order.tokenS]) {
-        ownerSpendables[order.owner][order.tokenS] = order.tokenSpendableS;
+        ownerSpendables[order.owner][order.tokenS] = {};
       }
-      assert.equal(order.tokenSpendableS, ownerSpendables[order.owner][order.tokenS],
+      if (!ownerSpendables[order.owner][order.tokenS][order.trancheS]) {
+        ownerSpendables[order.owner][order.tokenS][order.trancheS] = order.tokenSpendableS;
+      }
+      assert.equal(order.tokenSpendableS, ownerSpendables[order.owner][order.tokenS][order.trancheS],
                    "Spendable for tokenS should match");
       if (!ownerSpendables[order.owner][order.feeToken]) {
-        ownerSpendables[order.owner][order.feeToken] = order.tokenSpendableFee;
+        ownerSpendables[order.owner][order.feeToken] = {};
       }
-      assert.equal(order.tokenSpendableFee, ownerSpendables[order.owner][order.feeToken],
+      if (!ownerSpendables[order.owner][order.feeToken][zeroAddress]) {
+        ownerSpendables[order.owner][order.feeToken][zeroAddress] = order.tokenSpendableFee;
+      }
+      assert.equal(order.tokenSpendableFee, ownerSpendables[order.owner][order.feeToken][zeroAddress],
                    "Spendable for feeToken should match");
     }
   }

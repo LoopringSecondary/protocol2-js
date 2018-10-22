@@ -128,6 +128,7 @@ export class RingsGenerator {
   private setupSpendables(rings: RingsInfo) {
     let numSpendables = 0;
     const ownerTokens: { [id: string]: any; } = {};
+    const zeroAddress = "0x" + "0".repeat(64);
     const ownerBrokerTokens: { [id: string]: any; } = {};
     for (const order of rings.orders) {
       const tokenFee = order.feeToken ? order.feeToken : this.context.lrcAddress;
@@ -136,17 +137,23 @@ export class RingsGenerator {
         ownerTokens[order.owner] = {};
       }
       if (!ownerTokens[order.owner][order.tokenS]) {
-        ownerTokens[order.owner][order.tokenS] = {
+        ownerTokens[order.owner][order.tokenS] = {};
+      }
+      if (!ownerTokens[order.owner][order.tokenS][order.trancheS]) {
+        ownerTokens[order.owner][order.tokenS][order.trancheS] = {
           index: numSpendables++,
         };
       }
-      order.tokenSpendableS = ownerTokens[order.owner][order.tokenS];
+      order.tokenSpendableS = ownerTokens[order.owner][order.tokenS][order.trancheS];
       if (!ownerTokens[order.owner][tokenFee]) {
-        ownerTokens[order.owner][tokenFee] = {
+        ownerTokens[order.owner][tokenFee] = {};
+      }
+      if (!ownerTokens[order.owner][tokenFee][zeroAddress]) {
+        ownerTokens[order.owner][tokenFee][zeroAddress] = {
           index: numSpendables++,
         };
       }
-      order.tokenSpendableFee = ownerTokens[order.owner][tokenFee];
+      order.tokenSpendableFee = ownerTokens[order.owner][tokenFee][zeroAddress];
     }
     return numSpendables;
   }

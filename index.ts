@@ -13,3 +13,4 @@ export * from "./src/ring";
 export * from "./src/rings_generator";
 export * from "./src/types";
 export * from "./src/xor";
+export * from "./src/balance_book";

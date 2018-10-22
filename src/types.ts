@@ -1,4 +1,5 @@
 import { BigNumber } from "bignumber.js";
+import { BalanceBook } from "./balance_book";
 import { Bitstream } from "./bitstream";
 
 // Make sure to keep this in sync with the Multihash smart contract
@@ -170,7 +171,7 @@ export interface SimulatorReport {
   feeBalancesBefore: { [id: string]: any; };
   feeBalancesAfter: { [id: string]: any; };
   filledAmounts: { [hash: string]: BigNumber; };
-  balancesBefore: { [id: string]: any; };
+  balancesBefore: BalanceBook;
   balancesAfter: { [id: string]: any; };
   payments: TransactionPayments;
 }
@@ -182,8 +183,8 @@ export interface TransferItem {
   amount: BigNumber;
 
   // ERC1400
-  fromTranche?: string;
-  toTranche?: string;
+  fromTranche: string;
+  toTranche: string;
   data?: string;
 }
 

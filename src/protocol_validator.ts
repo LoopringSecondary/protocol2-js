@@ -33,6 +33,8 @@ export class ProtocolValidator {
   public async verifyTransaction(ringsInfo: RingsInfo,
                                  report: SimulatorReport,
                                  addressBook: { [id: string]: string; }) {
+    const zeroAddress = "0x" + "0".repeat(64);
+
     if (!ringsInfo.expected) {
       return;
     }
@@ -45,15 +47,7 @@ export class ProtocolValidator {
     }
 
     // Copy balances before
-    const expectedBalances: { [id: string]: any; } = {};
-    for (const token of Object.keys(report.balancesBefore)) {
-      for (const owner of Object.keys(report.balancesBefore[token])) {
-        if (!expectedBalances[token]) {
-          expectedBalances[token] = {};
-        }
-        expectedBalances[token][owner] = report.balancesBefore[token][owner];
-      }
-    }
+    const expectedBalances = report.balancesBefore.copy();
     // Copy fee balances before
     const expectedFeeBalances: { [id: string]: any; } = {};
     for (const token of Object.keys(report.feeBalancesBefore)) {
@@ -110,17 +104,13 @@ export class ProtocolValidator {
         // console.log("totalB: " + totalB / 1e18);
         // console.log("totalFee: " + totalFee / 1e18);
         // console.log("splitS: " + orderSettlement.splitS);
-        expectedBalances[order.tokenS][order.owner] =
-          expectedBalances[order.tokenS][order.owner].minus(totalS);
-        expectedBalances[order.tokenB][order.tokenRecipient] =
-          expectedBalances[order.tokenB][order.tokenRecipient].plus(totalB);
-        expectedBalances[order.feeToken][order.owner] =
-          expectedBalances[order.feeToken][order.owner].minus(totalFee);
+        expectedBalances.addBalance(order.owner, order.tokenS, order.trancheS, totalS.neg());
+        expectedBalances.addBalance(order.tokenRecipient, order.tokenB, order.trancheB, totalB);
+        expectedBalances.addBalance(order.owner, order.feeToken, zeroAddress, totalFee.neg());
 
         // Add margin given to the feeRecipient
         if (order.tokenTypeS !== TokenType.ERC1400) {
-          expectedBalances[order.tokenS][feeRecipient] =
-            expectedBalances[order.tokenS][feeRecipient].plus(orderSettlement.splitS);
+          expectedBalances.addBalance(feeRecipient, order.tokenS, order.trancheS, orderSettlement.splitS);
         }
 
         // Filled
@@ -134,18 +124,21 @@ export class ProtocolValidator {
 
     // const addressBook = this.getAddressBook(ringsInfo);
     // Check balances
-    for (const token of Object.keys(expectedBalances)) {
-      for (const owner of Object.keys(expectedBalances[token])) {
-        // const ownerName = addressBook[owner];
-        // const tokenSymbol = this.testContext.tokenAddrSymbolMap.get(token);
+    for (const owner of Object.keys(expectedBalances.getData())) {
+      for (const token of Object.keys(expectedBalances.getData()[owner])) {
+        for (const tranche of Object.keys(expectedBalances.getData()[owner][token])) {
+          // const ownerName = addressBook[owner];
+          // const tokenSymbol = this.testContext.tokenAddrSymbolMap.get(token);
+          // const tokenSymbol = token;
 
-        // console.log("[Sim]" + ownerName + ": " +
-        //   report.balancesAfter[token][owner].toNumber() / 1e18 + " " + tokenSymbol);
-        // console.log("[Exp]" + ownerName + ": " +
-        //   expectedBalances[token][owner].toNumber() / 1e18 + " " + tokenSymbol);
-        this.assertAlmostEqual(report.balancesAfter[token][owner].toNumber(),
-                               expectedBalances[token][owner].toNumber(),
-                               "Balance different than expected");
+          // console.log("[Sim]" + owner + ": " +
+          //   report.balancesAfter[owner][token][tranche].toNumber() / 1e18 + " " + tokenSymbol);
+          // console.log("[Exp]" + owner + ": " +
+          //   expectedBalances.getData()[owner][token][tranche].toNumber() / 1e18 + " " + tokenSymbol);
+          this.assertAlmostEqual(report.balancesAfter[owner][token][tranche].toNumber(),
+                                expectedBalances.getData()[owner][token][tranche].toNumber(),
+                                "Balance different than expected");
+        }
       }
     }
     // Check fee balances
