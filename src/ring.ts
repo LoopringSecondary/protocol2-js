@@ -286,10 +286,18 @@ export class Ring {
     assert(p.order.filledAmountS.lte(p.order.amountS), "filledAmountS <= amountS");
   }
 
-  public async adjustOrderStates() {
+  public adjustOrderStates() {
     // Adjust orders
     for (const p of this.participations) {
       this.adjustOrderState(p);
+    }
+  }
+
+  public revertOrderStats() {
+    // Adjust orders
+    for (const p of this.participations) {
+      p.order.filledAmountS = p.order.filledAmountS.minus(p.fillAmountS.plus(p.splitS));
+      assert(p.order.filledAmountS.gte(0), "p.order.filledAmountS >= 0");
     }
   }
 
