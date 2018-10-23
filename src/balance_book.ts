@@ -1,6 +1,14 @@
 import { BigNumber } from "bignumber.js";
 
+export interface Balance {
+  token: string;
+  tranche: string;
+  owner: string;
+  amount: BigNumber;
+}
+
 export class BalanceBook {
+
   private balances: { [id: string]: any; } = {};
 
   public getBalance(owner: string, token: string, tranche: string) {
@@ -45,6 +53,34 @@ export class BalanceBook {
 
   public getData() {
     return this.balances;
+  }
+
+  public getAllTokens() {
+    const tokens = [];
+    for (const owner of Object.keys(this.balances)) {
+      for (const token of Object.keys(this.balances[owner])) {
+        tokens.push(token);
+      }
+    }
+    return tokens;
+  }
+
+  public getAllBalances() {
+    const balanceList: Balance[] = [];
+    for (const owner of Object.keys(this.balances)) {
+      for (const token of Object.keys(this.balances[owner])) {
+        for (const tranche of Object.keys(this.balances[owner][token])) {
+          const balanceItem: Balance = {
+            owner,
+            token,
+            tranche,
+            amount: this.balances[owner][token][tranche],
+          };
+          balanceList.push(balanceItem);
+        }
+      }
+    }
+    return balanceList;
   }
 
 }

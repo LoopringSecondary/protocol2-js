@@ -1,5 +1,6 @@
 import { BigNumber } from "bignumber.js";
 import ABI = require("ethereumjs-abi");
+import { BalanceBook } from "./balance_book";
 import { Bitstream } from "./bitstream";
 import { Context } from "./context";
 import { ensure } from "./ensure";
@@ -21,7 +22,9 @@ export class Ring {
   private context: Context;
   private orderUtil: OrderUtil;
 
-  private feeBalances: { [id: string]: any; } = {};
+  private feeBalances = new BalanceBook();
+
+  private zeroAddress = "0x" + "0".repeat(64);
 
   // BEGIN diagnostics
   private detailTransferS: DetailedTokenTransfer[];
@@ -313,22 +316,21 @@ export class Ring {
     await this.validateSettlement(mining, transferItems);
 
     // Add the fee balances to the global fee list
-    for (const token of Object.keys(this.feeBalances)) {
-      for (const owner of Object.keys(this.feeBalances[token])) {
-        if (!feeBalances[token]) {
-          feeBalances[token] = {};
-        }
-        if (!feeBalances[token][owner]) {
-          feeBalances[token][owner] = new BigNumber(0);
-        }
-        feeBalances[token][owner] = feeBalances[token][owner].plus(this.feeBalances[token][owner]);
+    for (const balance of this.feeBalances.getAllBalances()) {
+      if (!feeBalances[balance.token]) {
+        feeBalances[balance.token] = {};
       }
+      if (!feeBalances[balance.token][balance.owner]) {
+        feeBalances[balance.token][balance.owner] = new BigNumber(0);
+      }
+      feeBalances[balance.token][balance.owner] =
+        feeBalances[balance.token][balance.owner].plus(balance.amount);
     }
 
     return transferItems;
   }
 
-  private transferTokens(mining: Mining) {
+  private async transferTokens(mining: Mining) {
     const ringSize = this.participations.length;
     const transferItems: TransferItem[] = [];
     for (let i = 0; i < ringSize; i++) {
@@ -359,38 +361,38 @@ export class Ring {
           margin = new BigNumber(0);
       }
 
-      this.addTokenTransfer(transferItems,
-                            p.order.tokenTypeS,
-                            p.order.trancheS,
-                            p.order.tokenS,
-                            p.order.owner,
-                            prevP.order.tokenRecipient,
-                            amountSToBuyer,
-                            p.order.transferDataS);
-      this.addTokenTransfer(transferItems,
-                            p.order.tokenTypeS,
-                            p.order.trancheS,
-                            p.order.tokenS,
-                            p.order.owner,
-                            feeHolder,
-                            amountSToFeeHolder,
-                            p.order.transferDataS);
-      this.addTokenTransfer(transferItems,
-                            p.order.tokenTypeFee,
-                            p.order.trancheFee,
-                            p.order.feeToken,
-                            p.order.owner,
-                            feeHolder,
-                            amountFeeToFeeHolder,
-                            undefined);
-      this.addTokenTransfer(transferItems,
-                            p.order.tokenTypeS,
-                            p.order.trancheS,
-                            p.order.tokenS,
-                            p.order.owner,
-                            mining.feeRecipient,
-                            margin,
-                            p.order.transferDataS);
+      await this.addTokenTransfer(transferItems,
+                                  p.order.tokenTypeS,
+                                  p.order.trancheS,
+                                  p.order.tokenS,
+                                  p.order.owner,
+                                  prevP.order.tokenRecipient,
+                                  amountSToBuyer,
+                                  p.order.transferDataS);
+      await this.addTokenTransfer(transferItems,
+                                  p.order.tokenTypeS,
+                                  p.order.trancheS,
+                                  p.order.tokenS,
+                                  p.order.owner,
+                                  feeHolder,
+                                  amountSToFeeHolder,
+                                  p.order.transferDataS);
+      await this.addTokenTransfer(transferItems,
+                                  p.order.tokenTypeFee,
+                                  p.order.trancheFee,
+                                  p.order.feeToken,
+                                  p.order.owner,
+                                  feeHolder,
+                                  amountFeeToFeeHolder,
+                                  "0x");
+      await this.addTokenTransfer(transferItems,
+                                  p.order.tokenTypeS,
+                                  p.order.trancheS,
+                                  p.order.tokenS,
+                                  p.order.owner,
+                                  mining.feeRecipient,
+                                  margin,
+                                  p.order.transferDataS);
 
       // BEGIN diagnostics
       this.detailTransferS[i].amount = p.fillAmountS.plus(margin).toNumber();
@@ -405,20 +407,23 @@ export class Ring {
     return transferItems;
   }
 
-  private addTokenTransfer(transferItems: TransferItem[],
-                           tokenType: TokenType,
-                           fromTranche: string,
-                           token: string,
-                           from: string,
-                           to: string,
-                           amount: BigNumber,
-                           data: string) {
-    const zeroAddress = "0x" + "0".repeat(64);
+  private async addTokenTransfer(transferItems: TransferItem[],
+                                 tokenType: TokenType,
+                                 fromTranche: string,
+                                 token: string,
+                                 from: string,
+                                 to: string,
+                                 amount: BigNumber,
+                                 data: string) {
     if (from !== to && amount.gt(0)) {
       if (tokenType === TokenType.ERC20) {
-        transferItems.push({token, from, to, amount, fromTranche: zeroAddress, toTranche: zeroAddress});
+        transferItems.push({token, from, to, amount, fromTranche: this.zeroAddress, toTranche: this.zeroAddress});
       } else if (tokenType === TokenType.ERC1400) {
-        transferItems.push({token, from, to, amount, fromTranche, toTranche: fromTranche, data: data ? data : "0x"});
+        const ERC1400token = this.context.ERC1400Contract.at(token);
+        const tranferData = data ? data : "0x";
+        const [ESC, unused, destTranche] = await ERC1400token.canSend(from, to, fromTranche, amount, tranferData);
+        assert(ESC === "0x01", "Cannot transfer ERC1400 tokens");
+        transferItems.push({token, from, to, amount, fromTranche, toTranche: destTranche, data: tranferData});
       }
     }
   }
@@ -586,13 +591,7 @@ export class Ring {
     if (!token || !to || !amount) {
       return;
     }
-    if (!this.feeBalances[token]) {
-      this.feeBalances[token] = {};
-    }
-    if (!this.feeBalances[token][to]) {
-      this.feeBalances[token][to] = new BigNumber(0);
-    }
-    this.feeBalances[token][to] = this.feeBalances[token][to].plus(amount);
+    this.feeBalances.addBalance(to, token, this.zeroAddress, amount);
   }
 
   private resize(i: number, smallest: number) {
@@ -617,7 +616,8 @@ export class Ring {
   }
 
   private async validateSettlement(mining: Mining, transfers: TransferItem[]) {
-    const expectedTotalBurned: { [id: string]: BigNumber; } = {};
+    const expectedTotalBurned = new BalanceBook();
+    const feeAddress = this.context.feeHolder.address;
     const ringSize = this.participations.length;
     for (let i = 0; i < ringSize; i++) {
       const prevIndex = (i + ringSize - 1) % ringSize;
@@ -776,43 +776,24 @@ export class Ring {
       assert(p.rebateB.eq(expectedRebateB), "FeeB rebate should match expected value");
 
       // Add burn rates to total expected burn rates
-      if (!expectedTotalBurned[p.order.feeToken]) {
-        expectedTotalBurned[p.order.feeToken] = new BigNumber(0);
-      }
-      expectedTotalBurned[p.order.feeToken] = expectedTotalBurned[p.order.feeToken].plus(expectedBurnFee);
-      if (!expectedTotalBurned[p.order.tokenS]) {
-        expectedTotalBurned[p.order.tokenS] = new BigNumber(0);
-      }
-      expectedTotalBurned[p.order.tokenS] = expectedTotalBurned[p.order.tokenS].plus(expectedBurnS);
-      if (!expectedTotalBurned[p.order.tokenB]) {
-        expectedTotalBurned[p.order.tokenB] = new BigNumber(0);
-      }
-      expectedTotalBurned[p.order.tokenB] = expectedTotalBurned[p.order.tokenB].plus(expectedBurnB);
+      expectedTotalBurned.addBalance(this.zeroAddress, p.order.feeToken, this.zeroAddress, expectedBurnFee);
+      expectedTotalBurned.addBalance(this.zeroAddress, p.order.tokenS, p.order.trancheS, expectedBurnS);
+      expectedTotalBurned.addBalance(this.zeroAddress, p.order.tokenB, p.order.trancheB, expectedBurnB);
 
       // Ensure fees in tokenB can be paid with the amount bought
-      assert(prevP.feeAmountB.lte(p.fillAmountS),
-             "Can't pay more in tokenB fees than what was bought");
+      assert(prevP.feeAmountB.lte(p.fillAmountS), "Can't pay more in tokenB fees than what was bought");
     }
 
     // Ensure balances are updated correctly
     // Simulate the token transfers in the ring
-    const balances: { [id: string]: any; } = {};
+    const balances = new BalanceBook();
     for (const transfer of transfers) {
-      if (!balances[transfer.token]) {
-        balances[transfer.token] = {};
-      }
-      if (!balances[transfer.token][transfer.from]) {
-        balances[transfer.token][transfer.from] = new BigNumber(0);
-      }
-      if (!balances[transfer.token][transfer.to]) {
-        balances[transfer.token][transfer.to] = new BigNumber(0);
-      }
-      balances[transfer.token][transfer.from] = balances[transfer.token][transfer.from].minus(transfer.amount);
-      balances[transfer.token][transfer.to] = balances[transfer.token][transfer.to].plus(transfer.amount);
+      balances.addBalance(transfer.from, transfer.token, transfer.fromTranche, transfer.amount.neg());
+      balances.addBalance(transfer.to, transfer.token, transfer.toTranche, transfer.amount);
     }
     // Accumulate owner balances and accumulate fees
-    const expectedBalances: { [id: string]: any; } = {};
-    const expectedFeeHolderBalances: { [id: string]: BigNumber; } = {};
+    const expectedBalances = new BalanceBook();
+    const expectedFeeBalances = new BalanceBook();
     for (let i = 0; i < ringSize; i++) {
       const p = this.participations[i];
       const nextP = this.participations[(i + 1) % ringSize];
@@ -822,110 +803,60 @@ export class Ring {
       const expectedBalanceFeeToken = p.feeAmount.minus(p.rebateFee).negated();
 
       // Accumulate balances
-      if (!expectedBalances[p.order.owner]) {
-        expectedBalances[p.order.owner] = {};
-      }
-      if (!expectedBalances[p.order.tokenRecipient]) {
-        expectedBalances[p.order.tokenRecipient] = {};
-      }
-      if (!expectedBalances[p.order.owner][p.order.tokenS]) {
-        expectedBalances[p.order.owner][p.order.tokenS] = new BigNumber(0);
-      }
-      if (!expectedBalances[p.order.tokenRecipient][p.order.tokenB]) {
-        expectedBalances[p.order.tokenRecipient][p.order.tokenB] = new BigNumber(0);
-      }
-      if (!expectedBalances[p.order.owner][p.order.feeToken]) {
-        expectedBalances[p.order.owner][p.order.feeToken] = new BigNumber(0);
-      }
-      if (!expectedBalances[mining.feeRecipient]) {
-        expectedBalances[mining.feeRecipient] = {};
-      }
-      if (!expectedBalances[mining.feeRecipient][p.order.tokenS]) {
-        expectedBalances[mining.feeRecipient][p.order.tokenS] = new BigNumber(0);
-      }
-      expectedBalances[p.order.owner][p.order.tokenS] =
-        expectedBalances[p.order.owner][p.order.tokenS].plus(expectedBalanceS);
-      expectedBalances[p.order.tokenRecipient][p.order.tokenB] =
-        expectedBalances[p.order.tokenRecipient][p.order.tokenB].plus(expectedBalanceB);
-      expectedBalances[p.order.owner][p.order.feeToken] =
-        expectedBalances[p.order.owner][p.order.feeToken].plus(expectedBalanceFeeToken);
-      expectedBalances[mining.feeRecipient][p.order.tokenS] =
-        expectedBalances[mining.feeRecipient][p.order.tokenS].plus(p.splitS);
+      expectedBalances.addBalance(p.order.owner, p.order.tokenS, p.order.trancheS, expectedBalanceS);
+      expectedBalances.addBalance(p.order.tokenRecipient, p.order.tokenB, p.order.trancheB, expectedBalanceB);
+      expectedBalances.addBalance(p.order.owner, p.order.feeToken, this.zeroAddress, expectedBalanceFeeToken);
+      expectedBalances.addBalance(mining.feeRecipient, p.order.tokenS, p.order.trancheS, p.splitS);
 
       // Accumulate fees
-      if (!expectedFeeHolderBalances[p.order.tokenS]) {
-        expectedFeeHolderBalances[p.order.tokenS] = new BigNumber(0);
-      }
-      if (!expectedFeeHolderBalances[p.order.tokenB]) {
-        expectedFeeHolderBalances[p.order.tokenB] = new BigNumber(0);
-      }
-      if (!expectedFeeHolderBalances[p.order.feeToken]) {
-        expectedFeeHolderBalances[p.order.feeToken] = new BigNumber(0);
-      }
-      expectedFeeHolderBalances[p.order.tokenS] =
-        expectedFeeHolderBalances[p.order.tokenS].plus(p.feeAmountS.minus(p.rebateS));
-      expectedFeeHolderBalances[p.order.tokenB] =
-        expectedFeeHolderBalances[p.order.tokenB].plus(p.feeAmountB.minus(p.rebateB));
-      expectedFeeHolderBalances[p.order.feeToken] =
-        expectedFeeHolderBalances[p.order.feeToken].plus(p.feeAmount.minus(p.rebateFee));
+      expectedFeeBalances.addBalance(feeAddress, p.order.tokenS, p.order.trancheS, p.feeAmountS.minus(p.rebateS));
+      expectedFeeBalances.addBalance(feeAddress, p.order.tokenB, p.order.trancheB, p.feeAmountB.minus(p.rebateB));
+      expectedFeeBalances.addBalance(feeAddress, p.order.feeToken, this.zeroAddress, p.feeAmount.minus(p.rebateFee));
     }
     // Check balances of all owners
     for (let i = 0; i < ringSize; i++) {
       const p = this.participations[i];
-      const balanceS = (balances[p.order.tokenS] && balances[p.order.tokenS][p.order.owner])
-                      ? balances[p.order.tokenS][p.order.owner] : new BigNumber(0);
-      const balanceB = (balances[p.order.tokenB] && balances[p.order.tokenB][p.order.tokenRecipient])
-                      ? balances[p.order.tokenB][p.order.tokenRecipient] : new BigNumber(0);
-      const balanceFeeToken = (balances[p.order.feeToken] && balances[p.order.feeToken][p.order.owner])
-                             ? balances[p.order.feeToken][p.order.owner] : new BigNumber(0);
-      assert(balanceS.eq(expectedBalances[p.order.owner][p.order.tokenS]),
-             "Order owner tokenS balance should match expected value");
-      assert(balanceB.eq(expectedBalances[p.order.tokenRecipient][p.order.tokenB]),
-             "Order tokenRecipient tokenB balance should match expected value");
-      assert(balanceFeeToken.eq(expectedBalances[p.order.owner][p.order.feeToken]),
-             "Order owner feeToken balance should match expected value");
+
+      const balanceS = balances.getBalance(p.order.owner, p.order.tokenS, p.order.trancheS);
+      const balanceB = balances.getBalance(p.order.tokenRecipient, p.order.tokenB, p.order.trancheB);
+      const balanceFee = balances.getBalance(p.order.owner, p.order.feeToken, this.zeroAddress);
+
+      const expectedBalanceS = expectedBalances.getBalance(p.order.owner, p.order.tokenS, p.order.trancheS);
+      const expectedBalanceB = expectedBalances.getBalance(p.order.tokenRecipient, p.order.tokenB, p.order.trancheB);
+      const expectedBalanceFee = expectedBalances.getBalance(p.order.owner, p.order.feeToken, this.zeroAddress);
+
+      assert(balanceS.eq(expectedBalanceS), "Order owner tokenS balance should match expected value");
+      assert(balanceB.eq(expectedBalanceB), "Order tokenRecipient tokenB balance should match expected value");
+      assert(balanceFee.eq(expectedBalanceFee), "Order owner feeToken balance should match expected value");
     }
     // Check fee holder balances of all possible tokens used to pay fees
-    for (const token of [...Object.keys(expectedFeeHolderBalances), ...Object.keys(balances)]) {
-      const feeAddress = this.context.feeHolder.address;
-      const expectedBalance =
-        expectedFeeHolderBalances[token] ? expectedFeeHolderBalances[token] : new BigNumber(0);
-      const balance =
-        (balances[token] && balances[token][feeAddress]) ? balances[token][feeAddress] : new BigNumber(0);
+    for (const token of [...Object.keys(expectedFeeBalances), ...balances.getAllTokens()]) {
+      const expectedBalance = expectedFeeBalances.getBalance(feeAddress, token, this.zeroAddress);
+      const balance = balances.getBalance(feeAddress, token, this.zeroAddress);
       assert(balance.eq(expectedBalance),
-                        "FeeHolder balance after transfers should match expected value");
+             "FeeHolder balance after transfers should match expected value");
     }
 
     // Ensure total fee payments match transferred amounts to feeHolder contract
     {
-      for (const token of [...Object.keys(this.feeBalances), ...Object.keys(balances)]) {
-        const feeAddress = this.context.feeHolder.address;
+      for (const token of [...Object.keys(this.feeBalances.getAllTokens()), ...Object.keys(balances.getAllTokens())]) {
         let totalFee = new BigNumber(0);
-        if (this.feeBalances[token]) {
-          for (const owner of Object.keys(this.feeBalances[token])) {
-            totalFee = totalFee.plus(this.feeBalances[token][owner]);
+        for (const balance of this.feeBalances.getAllBalances()) {
+          if (balance.token === token) {
+            totalFee = totalFee.plus(balance.amount);
           }
         }
-        let feeHolderBalance = new BigNumber(0);
-        if (balances[token] && balances[token][feeAddress]) {
-          feeHolderBalance = balances[token][feeAddress];
-        }
-        assert(totalFee.eq(feeHolderBalance),
-                           "Total fees amount in feeHolder should match total amount transferred");
+        const feeHolderBalance = balances.getBalance(feeAddress, token, this.zeroAddress);
+        assert(totalFee.eq(feeHolderBalance), "Total fee amount in feeHolder should match total amount transferred");
       }
     }
 
     // Ensure total burn payments match expected total burned
-    for (const token of [...Object.keys(expectedTotalBurned), ...Object.keys(this.feeBalances)]) {
-      const feeAddress = this.context.feeHolder.address;
-      let burned = new BigNumber(0);
-      let expected = new BigNumber(0);
-      if (this.feeBalances[token] && this.feeBalances[token][feeAddress]) {
-        burned = this.feeBalances[token][feeAddress];
-      }
-      if (expectedTotalBurned[token]) {
-        expected = expectedTotalBurned[token];
-      }
+    const burnTokens = [...Object.keys(expectedTotalBurned.getAllTokens()),
+                        ...Object.keys(this.feeBalances.getAllTokens())];
+    for (const token of burnTokens) {
+      const burned = this.feeBalances.getBalance(this.zeroAddress, token, this.zeroAddress);
+      const expected = expectedTotalBurned.getBalance(this.zeroAddress, token, this.zeroAddress);
       assert(burned.eq(expected), "Total burned should match expected value");
     }
   }
