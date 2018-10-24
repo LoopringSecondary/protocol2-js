@@ -49,15 +49,8 @@ export class ProtocolValidator {
     // Copy balances before
     const expectedBalances = report.balancesBefore.copy();
     // Copy fee balances before
-    const expectedFeeBalances: { [id: string]: any; } = {};
-    for (const token of Object.keys(report.feeBalancesBefore)) {
-      for (const owner of Object.keys(report.feeBalancesBefore[token])) {
-        if (!expectedFeeBalances[token]) {
-          expectedFeeBalances[token] = {};
-        }
-        expectedFeeBalances[token][owner] = report.feeBalancesBefore[token][owner];
-      }
-    }
+    const expectedFeeBalances = report.feeBalancesBefore.copy();
+
     // Intialize filled amounts
     const expectedfilledAmounts: { [id: string]: BigNumber; } = {};
     for (const order of ringsInfo.orders) {
@@ -122,42 +115,27 @@ export class ProtocolValidator {
       }
     }
 
-    // const addressBook = this.getAddressBook(ringsInfo);
     // Check balances
-    for (const owner of Object.keys(expectedBalances.getData())) {
-      for (const token of Object.keys(expectedBalances.getData()[owner])) {
-        for (const tranche of Object.keys(expectedBalances.getData()[owner][token])) {
-          // const ownerName = addressBook[owner];
-          // const tokenSymbol = this.testContext.tokenAddrSymbolMap.get(token);
-          // const tokenSymbol = token;
-
-          // console.log("[Sim]" + owner + ": " +
-          //   report.balancesAfter[owner][token][tranche].toNumber() / 1e18 + " " + tokenSymbol);
-          // console.log("[Exp]" + owner + ": " +
-          //   expectedBalances.getData()[owner][token][tranche].toNumber() / 1e18 + " " + tokenSymbol);
-          this.assertAlmostEqual(report.balancesAfter[owner][token][tranche].toNumber(),
-                                expectedBalances.getData()[owner][token][tranche].toNumber(),
-                                "Balance different than expected");
-        }
-      }
+    for (const balance of expectedBalances.getAllBalances()) {
+      this.assertAlmostEqual(
+        report.balancesAfter.getBalance(balance.owner, balance.token, balance.tranche).toNumber(),
+        expectedBalances.getBalance(balance.owner, balance.token, balance.tranche).toNumber(),
+        "Balance different than expected",
+      );
     }
+
     // Check fee balances
     for (const feePayment of feePayments) {
-      expectedFeeBalances[feePayment.token][feePayment.owner] =
-        expectedFeeBalances[feePayment.token][feePayment.owner].plus(feePayment.amount);
+      expectedFeeBalances.addBalance(feePayment.owner, feePayment.token, zeroAddress, feePayment.amount);
     }
-    for (const token of Object.keys(expectedFeeBalances)) {
-      for (const owner of Object.keys(expectedFeeBalances[token])) {
-        // const ownerName = addressBook[owner];
-        // const tokenSymbol = this.testContext.tokenAddrSymbolMap.get(token);
+    for (const balance of expectedFeeBalances.getAllBalances()) {
+      this.assertAlmostEqual(
+        report.feeBalancesAfter.getBalance(balance.owner, balance.token, balance.tranche).toNumber(),
+        expectedFeeBalances.getBalance(balance.owner, balance.token, balance.tranche).toNumber(),
+        "Fee balance different than expected",
+      );
+    }
 
-        // console.log("[Sim]" + ownerName + ": " + report.feeBalancesAfter[token][owner] / 1e18 + " " + tokenSymbol);
-        // console.log("[Exp]" + ownerName + ": " + expectedFeeBalances[token][owner] / 1e18 + " " + tokenSymbol);
-        this.assertAlmostEqual(report.feeBalancesAfter[token][owner].toNumber(),
-                               expectedFeeBalances[token][owner].toNumber(),
-                               "Fee balance different than expected");
-      }
-    }
     // Check filled
     for (const order of ringsInfo.orders) {
       const orderHash = order.hash.toString("hex");

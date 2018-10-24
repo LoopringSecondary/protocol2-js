@@ -168,11 +168,11 @@ export interface SimulatorReport {
   reverted: boolean;
   ringMinedEvents: RingMinedEvent[];
   transferItems: TransferItem[];
-  feeBalancesBefore: { [id: string]: any; };
-  feeBalancesAfter: { [id: string]: any; };
+  feeBalancesBefore: BalanceBook;
+  feeBalancesAfter: BalanceBook;
   filledAmounts: { [hash: string]: BigNumber; };
   balancesBefore: BalanceBook;
-  balancesAfter: { [id: string]: any; };
+  balancesAfter: BalanceBook;
   payments: TransactionPayments;
 }
 

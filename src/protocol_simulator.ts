@@ -94,7 +94,7 @@ export class ProtocolSimulator {
 
     const ringMinedEvents: RingMinedEvent[] = [];
     const transferItems: TransferItem[] = [];
-    const feeBalances: { [id: string]: any; } = {};
+    const feeBalances = new BalanceBook();
     for (const ring of rings) {
       ring.checkOrdersValid();
       ring.checkForSubRings();
@@ -175,7 +175,7 @@ export class ProtocolSimulator {
     }
   }
 
-  private async simulateAndReportSingle(ring: Ring, mining: Mining, feeBalances: { [id: string]: any; }) {
+  private async simulateAndReportSingle(ring: Ring, mining: Mining, feeBalances: BalanceBook) {
     const transferItems = await ring.doPayments(mining, feeBalances);
     const ringMinedEvent: RingMinedEvent = {
       ringIndex: new BigNumber(this.ringIndex++),
@@ -250,7 +250,7 @@ export class ProtocolSimulator {
                               mining: Mining,
                               rings: Ring[],
                               transferItems: TransferItem[],
-                              feeBalances: { [id: string]: any; },
+                              feeBalances: BalanceBook,
                               ringMinedEvents: RingMinedEvent[]) {
     const orders = ringsInfo.orders;
     const zeroAddress = "0x" + "0".repeat(64);
@@ -299,48 +299,27 @@ export class ProtocolSimulator {
     }
 
     // Get the fee balances before the transaction
-    const feeBalancesBefore: { [id: string]: any; } = {};
+    const feeBalancesBefore = new BalanceBook();
+    const feeHolder = this.context.feeHolder.address;
     for (const order of orders) {
       const tokens = [order.tokenS, order.tokenB, order.feeToken];
+      const feeRecipients = [order.owner, order.walletAddr, mining.feeRecipient, feeHolder];
       for (const token of tokens) {
-        if (!feeBalancesBefore[token]) {
-          feeBalancesBefore[token] = {};
-        }
-        // Owner
-        if (!feeBalancesBefore[token][order.owner]) {
-          feeBalancesBefore[token][order.owner] =
-            await this.context.feeHolder.feeBalances(token, order.owner);
-        }
-        // Wallet
-        if (order.walletAddr && !feeBalancesBefore[token][order.walletAddr]) {
-          feeBalancesBefore[token][order.walletAddr] =
-            await this.context.feeHolder.feeBalances(token, order.walletAddr);
-        }
-        // FeeRecipient
-        if (!feeBalancesBefore[token][mining.feeRecipient]) {
-          feeBalancesBefore[token][mining.feeRecipient] =
-            await this.context.feeHolder.feeBalances(token, mining.feeRecipient);
-        }
-        // Burned
-        const feeHolder = this.context.feeHolder.address;
-        if (!feeBalancesBefore[token][feeHolder]) {
-          feeBalancesBefore[token][feeHolder] =
-            await this.context.feeHolder.feeBalances(token, feeHolder);
+        for (const feeRecipient of feeRecipients) {
+          if (feeRecipient && !feeBalancesBefore.isBalanceKnown(feeRecipient, token, zeroAddress)) {
+            feeBalancesBefore.addBalance(feeRecipient,
+                                         token,
+                                         zeroAddress,
+                                         await this.context.feeHolder.feeBalances(token, feeRecipient));
+          }
         }
       }
     }
 
     // Calculate the balances after the transaction
-    const feeBalancesAfter: { [id: string]: any; } = {};
-    for (const token of Object.keys(feeBalancesBefore)) {
-      for (const owner of Object.keys(feeBalancesBefore[token])) {
-        if (!feeBalancesAfter[token]) {
-          feeBalancesAfter[token] = {};
-        }
-        const delta = (feeBalances[token] && feeBalances[token][owner]) ?
-                      feeBalances[token][owner] : new BigNumber(0);
-        feeBalancesAfter[token][owner] = feeBalancesBefore[token][owner].plus(delta);
-      }
+    const feeBalancesAfter = feeBalancesBefore.copy();
+    for (const balance of feeBalances.getAllBalances()) {
+      feeBalancesAfter.addBalance(balance.owner, balance.token, balance.tranche, balance.amount);
     }
 
     // Get the filled amounts
@@ -370,7 +349,7 @@ export class ProtocolSimulator {
       feeBalancesAfter,
       filledAmounts,
       balancesBefore,
-      balancesAfter: balancesAfter.getData(),
+      balancesAfter,
       payments,
     };
     return simulatorReport;
@@ -382,12 +361,8 @@ export class ProtocolSimulator {
     const zeroAddress = "0x" + "0".repeat(64);
 
     // Check if we haven't spent more funds than the owner owns
-    for (const owner of Object.keys(report.balancesAfter)) {
-      for (const token of Object.keys(report.balancesAfter[owner])) {
-        for (const tranche of Object.keys(report.balancesAfter[owner][token])) {
-          assert(report.balancesAfter[owner][token][tranche].gte(0), "can't sell more tokens than the owner owns");
-        }
-      }
+    for (const balance of report.balancesAfter.getAllBalances()) {
+      assert(balance.amount.gte(0), "can't sell more tokens than the owner owns");
     }
 
     // Check if the spendables were updated correctly

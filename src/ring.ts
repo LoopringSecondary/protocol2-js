@@ -304,7 +304,7 @@ export class Ring {
     }
   }
 
-  public async doPayments(mining: Mining, feeBalances: { [id: string]: any; }) {
+  public async doPayments(mining: Mining, feeBalances: BalanceBook) {
     if (!this.valid) {
       return [];
     }
@@ -317,14 +317,7 @@ export class Ring {
 
     // Add the fee balances to the global fee list
     for (const balance of this.feeBalances.getAllBalances()) {
-      if (!feeBalances[balance.token]) {
-        feeBalances[balance.token] = {};
-      }
-      if (!feeBalances[balance.token][balance.owner]) {
-        feeBalances[balance.token][balance.owner] = new BigNumber(0);
-      }
-      feeBalances[balance.token][balance.owner] =
-        feeBalances[balance.token][balance.owner].plus(balance.amount);
+      feeBalances.addBalance(balance.owner, balance.token, balance.tranche, balance.amount);
     }
 
     return transferItems;

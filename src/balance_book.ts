@@ -11,7 +11,9 @@ export class BalanceBook {
 
   private balances: { [id: string]: any; } = {};
 
-  public getBalance(owner: string, token: string, tranche: string) {
+  private zeroAddress = "0x" + "0".repeat(64);
+
+  public getBalance(owner: string, token: string, tranche: string = this.zeroAddress) {
     if (this.isBalanceKnown(owner, token, tranche)) {
         return this.balances[owner][token][tranche];
     } else {
