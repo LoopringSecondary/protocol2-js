@@ -123,14 +123,15 @@ export interface RingExpectation {
 
 export interface TransactionExpectation {
   revert?: boolean;
+  revertMessage?: string;
   rings?: RingExpectation[];
 }
 
 export interface RingsInfo {
   description?: string;
-  feeRecipient?: string; // spec value: 1
-  miner?: string;        // spec value: 1 << 1
-  sig?: string;          // spec value: 1 << 2
+  feeRecipient?: string;
+  miner?: string;
+  sig?: string;
   rings: number[][];
   orders: OrderInfo[];
 
@@ -166,11 +167,14 @@ export interface TransactionPayments {
 
 export interface SimulatorReport {
   reverted: boolean;
+  revertMessage?: string;
   ringMinedEvents: RingMinedEvent[];
+  invalidRingEvents: InvalidRingEvent[];
   transferItems: TransferItem[];
   feeBalancesBefore: BalanceBook;
   feeBalancesAfter: BalanceBook;
-  filledAmounts: { [hash: string]: BigNumber; };
+  filledAmountsBefore: { [hash: string]: BigNumber; };
+  filledAmountsAfter: { [hash: string]: BigNumber; };
   balancesBefore: BalanceBook;
   balancesAfter: BalanceBook;
   payments: TransactionPayments;
@@ -188,6 +192,22 @@ export interface TransferItem {
   data?: string;
 }
 
+export interface Fill {
+  orderHash: string;
+  owner: string;
+  tokenS: string;
+  amountS: BigNumber;
+  split: BigNumber;
+  feeAmount: BigNumber;
+}
+
 export interface RingMinedEvent {
   ringIndex: BigNumber;
+  ringHash: string;
+  feeRecipient: string;
+  fills: Fill[];
+}
+
+export interface InvalidRingEvent {
+  ringHash: string;
 }

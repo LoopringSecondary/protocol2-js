@@ -8,8 +8,8 @@ import { ExchangeDeserializer } from "./exchange_deserializer";
 import { Mining } from "./mining";
 import { OrderUtil } from "./order";
 import { Ring } from "./ring";
-import { OrderInfo, RingMinedEvent, RingsInfo, SimulatorReport, Spendable, TokenType,
-         TransactionPayments, TransferItem } from "./types";
+import { InvalidRingEvent, OrderInfo, RingMinedEvent, RingsInfo, SimulatorReport, Spendable,
+         TokenType, TransactionPayments, TransferItem } from "./types";
 import { xor } from "./xor";
 
 export class ProtocolSimulator {
@@ -17,7 +17,6 @@ export class ProtocolSimulator {
   public context: Context;
   public offLineMode: boolean = false;
 
-  private ringIndex: number = 0;
   private orderUtil: OrderUtil;
 
   constructor(context: Context) {
@@ -86,13 +85,14 @@ export class ProtocolSimulator {
     mining.updateHash(rings);
     await mining.updateMinerAndInterceptor();
     assert(mining.checkMinerSignature(ringsInfo.transactionOrigin) === true,
-           "Invalid miner signature");
+           "INVALID_SIG");
 
     for (const order of orders) {
       this.orderUtil.checkDualAuthSignature(order, mining.hash);
     }
 
     const ringMinedEvents: RingMinedEvent[] = [];
+    const invalidRingEvents: InvalidRingEvent[] = [];
     const transferItems: TransferItem[] = [];
     const feeBalances = new BalanceBook();
     for (const ring of rings) {
@@ -129,6 +129,11 @@ export class ProtocolSimulator {
             transferItems.push(ringTransferItem);
           }
         }
+      } else {
+        const invalidRingEvent: InvalidRingEvent = {
+          ringHash: "0x" + ring.hash.toString("hex"),
+        };
+        invalidRingEvents.push(invalidRingEvent);
       }
     }
 
@@ -137,7 +142,8 @@ export class ProtocolSimulator {
                                            rings,
                                            transferItems,
                                            feeBalances,
-                                           ringMinedEvents);
+                                           ringMinedEvents,
+                                           invalidRingEvents);
 
     await this.validateRings(ringsInfo, report);
 
@@ -177,8 +183,12 @@ export class ProtocolSimulator {
 
   private async simulateAndReportSingle(ring: Ring, mining: Mining, feeBalances: BalanceBook) {
     const transferItems = await ring.doPayments(mining, feeBalances);
+    const fills = ring.generateFills();
     const ringMinedEvent: RingMinedEvent = {
-      ringIndex: new BigNumber(this.ringIndex++),
+      ringIndex: new BigNumber(this.context.ringIndex++),
+      ringHash: "0x" + ring.hash.toString("hex"),
+      feeRecipient: mining.feeRecipient,
+      fills,
     };
     return {ringMinedEvent, transferItems};
   }
@@ -251,7 +261,8 @@ export class ProtocolSimulator {
                               rings: Ring[],
                               transferItems: TransferItem[],
                               feeBalances: BalanceBook,
-                              ringMinedEvents: RingMinedEvent[]) {
+                              ringMinedEvents: RingMinedEvent[],
+                              invalidRingEvents: InvalidRingEvent[]) {
     const orders = ringsInfo.orders;
     const zeroAddress = "0x" + "0".repeat(64);
 
@@ -322,14 +333,22 @@ export class ProtocolSimulator {
       feeBalancesAfter.addBalance(balance.owner, balance.token, balance.tranche, balance.amount);
     }
 
-    // Get the filled amounts
-    const filledAmounts: { [hash: string]: BigNumber; } = {};
+    // Get the filled amounts before
+    const filledAmountsBefore: { [hash: string]: BigNumber; } = {};
     for (const order of orders) {
+      const orderHash = order.hash.toString("hex");
+      filledAmountsBefore[orderHash] = await this.context.tradeDelegate.filled("0x" + orderHash);
+    }
+
+    // Filled amounts after
+    const filledAmountsAfter: { [hash: string]: BigNumber; } = {};
+    for (const order of orders) {
+      const orderHash = order.hash.toString("hex");
       let filledAmountS = order.filledAmountS ? order.filledAmountS : new BigNumber(0);
       if (!order.valid) {
-        filledAmountS = await this.context.tradeDelegate.filled("0x" + order.hash.toString("hex"));
+        filledAmountS = filledAmountsBefore[orderHash];
       }
-      filledAmounts[order.hash.toString("hex")] = filledAmountS;
+      filledAmountsAfter[orderHash] = filledAmountS;
     }
 
     // Collect the payments
@@ -344,10 +363,12 @@ export class ProtocolSimulator {
     const simulatorReport: SimulatorReport = {
       reverted: false,
       ringMinedEvents,
+      invalidRingEvents,
       transferItems,
       feeBalancesBefore,
       feeBalancesAfter,
-      filledAmounts,
+      filledAmountsBefore,
+      filledAmountsAfter,
       balancesBefore,
       balancesAfter,
       payments,
