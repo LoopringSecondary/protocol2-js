@@ -126,6 +126,9 @@ export class Ring {
       this.valid = this.valid &&
                    ensure(this.participations[i].order.tokenS === this.participations[prevIndex].order.tokenB,
                           "tokenS/tokenB mismatch");
+      this.valid = this.valid &&
+                   ensure(this.participations[i].order.tokenTypeS === this.participations[prevIndex].order.tokenTypeB,
+                          "tokenTypeS/tokenTypeB mismatch");
     }
   }
 

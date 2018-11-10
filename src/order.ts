@@ -110,6 +110,9 @@ export class OrderUtil {
       this.toBN(order.tokenSFeePercentage),
       this.toBN(order.tokenBFeePercentage),
       order.allOrNone,
+      order.tokenTypeS ? order.tokenTypeS : TokenType.ERC20,
+      order.tokenTypeB ? order.tokenTypeB : TokenType.ERC20,
+      order.tokenTypeFee ? order.tokenTypeFee : TokenType.ERC20,
       order.trancheS ? order.trancheS : "0x0",
       order.trancheB ? order.trancheB : "0x0",
       transferDataSHash,
@@ -133,6 +136,9 @@ export class OrderUtil {
       "uint16",
       "uint16",
       "bool",
+      "uint8",
+      "uint8",
+      "uint8",
       "bytes32",
       "bytes32",
       "bytes32",
@@ -143,6 +149,7 @@ export class OrderUtil {
 
   public toOrderBookSubmitParams(orderInfo: OrderInfo) {
     const emptyAddr = "0x" + "0".repeat(40);
+    const zeroBytes32 = "0x" + "0".repeat(64);
 
     const data = new Bitstream();
     data.addAddress(orderInfo.owner, 32);
@@ -163,6 +170,17 @@ export class OrderUtil {
     data.addNumber(orderInfo.tokenBFeePercentage ? orderInfo.tokenBFeePercentage : 0, 32);
     data.addAddress(orderInfo.tokenRecipient ? orderInfo.tokenRecipient : orderInfo.owner, 32);
     data.addNumber(orderInfo.walletSplitPercentage ? orderInfo.walletSplitPercentage : 0, 32);
+    data.addNumber(orderInfo.tokenTypeS ? orderInfo.tokenTypeS : TokenType.ERC20, 32);
+    data.addNumber(orderInfo.tokenTypeB ? orderInfo.tokenTypeB : TokenType.ERC20, 32);
+    data.addNumber(orderInfo.tokenTypeFee ? orderInfo.tokenTypeFee : TokenType.ERC20, 32);
+    data.addHex(orderInfo.trancheS ? orderInfo.trancheS : zeroBytes32);
+    data.addHex(orderInfo.trancheB ? orderInfo.trancheB : zeroBytes32);
+    if (orderInfo.transferDataS) {
+      data.addNumber((orderInfo.transferDataS.length - 2) / 2, 32);
+      data.addHex(orderInfo.transferDataS);
+    } else {
+      data.addNumber(0, 32);
+    }
 
     return data.getData();
   }
