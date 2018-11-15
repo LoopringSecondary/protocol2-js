@@ -186,6 +186,7 @@ export interface TransferItem {
   from: string;
   to: string;
   amount: BigNumber;
+  tokenType: TokenType;
 
   // ERC1400
   fromTranche: string;

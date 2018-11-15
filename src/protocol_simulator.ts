@@ -119,6 +119,7 @@ export class ProtocolSimulator {
             if (transferItem.token === ringTransferItem.token &&
                 transferItem.from === ringTransferItem.from &&
                 transferItem.to === ringTransferItem.to &&
+                transferItem.tokenType === ringTransferItem.tokenType &&
                 transferItem.fromTranche === ringTransferItem.fromTranche &&
                 transferItem.data === ringTransferItem.data) {
                 transferItem.amount = transferItem.amount.plus(ringTransferItem.amount);

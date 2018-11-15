@@ -439,13 +439,15 @@ export class Ring {
                                  data: string) {
     if (from !== to && amount.gt(0)) {
       if (tokenType === TokenType.ERC20) {
-        transferItems.push({token, from, to, amount, fromTranche: this.zeroAddress, toTranche: this.zeroAddress});
+        transferItems.push({token, from, to, amount, tokenType,
+                            fromTranche: this.zeroAddress, toTranche: this.zeroAddress});
       } else if (tokenType === TokenType.ERC1400) {
         const ERC1400token = this.context.ERC1400Contract.at(token);
         const tranferData = data ? data : "0x";
         const [ESC, unused, destTranche] = await ERC1400token.canSend(from, to, fromTranche, amount, tranferData);
         assert(ESC === "0x01", "Cannot transfer ERC1400 tokens");
-        transferItems.push({token, from, to, amount, fromTranche, toTranche: destTranche, data: tranferData});
+        transferItems.push({token, from, to, amount, tokenType,
+                            fromTranche, toTranche: destTranche, data: tranferData});
       }
     }
   }
