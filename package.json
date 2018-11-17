@@ -1,6 +1,6 @@
 {
   "name": "protocol2-js",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "loopring protocol simulator core lib",
   "main": "index.ts",
   "repository": {

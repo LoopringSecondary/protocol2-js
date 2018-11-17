@@ -20,6 +20,8 @@ export class RingsGenerator {
   private SERIALIZATION_VERSION = 0;
   private ORDER_VERSION = 0;
 
+  private zeroAddress = "0x" + "0".repeat(64);
+
   constructor(context: Context) {
     this.context = context;
     this.orderUtil = new OrderUtil(context);
@@ -128,7 +130,6 @@ export class RingsGenerator {
   private setupSpendables(rings: RingsInfo) {
     let numSpendables = 0;
     const ownerTokens: { [id: string]: any; } = {};
-    const zeroAddress = "0x" + "0".repeat(64);
     const ownerBrokerTokens: { [id: string]: any; } = {};
     for (const order of rings.orders) {
       const tokenFee = order.feeToken ? order.feeToken : this.context.lrcAddress;
@@ -148,12 +149,12 @@ export class RingsGenerator {
       if (!ownerTokens[order.owner][tokenFee]) {
         ownerTokens[order.owner][tokenFee] = {};
       }
-      if (!ownerTokens[order.owner][tokenFee][zeroAddress]) {
-        ownerTokens[order.owner][tokenFee][zeroAddress] = {
+      if (!ownerTokens[order.owner][tokenFee][this.zeroAddress]) {
+        ownerTokens[order.owner][tokenFee][this.zeroAddress] = {
           index: numSpendables++,
         };
       }
-      order.tokenSpendableFee = ownerTokens[order.owner][tokenFee][zeroAddress];
+      order.tokenSpendableFee = ownerTokens[order.owner][tokenFee][this.zeroAddress];
     }
     return numSpendables;
   }
@@ -311,10 +312,18 @@ export class RingsGenerator {
     param.tables.addNumber(order.tokenTypeB, 2);
     param.tables.addNumber(order.tokenTypeFee, 2);
 
-    this.insertOffset(param, param.data.addHex(order.trancheS, false));
-    this.insertOffset(param, param.data.addHex(order.trancheB, false));
+    if (order.trancheS && order.trancheS !== "0x0" && order.trancheS !== this.zeroAddress) {
+      this.insertOffset(param, param.data.addHex(order.trancheS, false));
+    } else {
+      this.insertDefault(param);
+    }
+    if (order.trancheB && order.trancheB !== "0x0" && order.trancheB !== this.zeroAddress) {
+      this.insertOffset(param, param.data.addHex(order.trancheB, false));
+    } else {
+      this.insertDefault(param);
+    }
 
-    if (order.transferDataS) {
+    if (order.transferDataS && order.transferDataS !== "0x" && order.transferDataS !== "") {
       this.insertOffset(param, param.data.addHex(this.createBytes(order.transferDataS), false));
       this.addPadding(param);
     } else {
