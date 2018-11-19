@@ -182,7 +182,7 @@ export class Ring {
             this.participations[i].fillAmountS,
             this.participations[i].order.transferDataS ? this.participations[i].order.transferDataS : "0x0",
         );
-        this.valid = this.valid && ensure(ESC === "0x01", "canSend is false");
+        this.valid = this.valid && ensure(ESC === "0xa0" || ESC === "0xa1" || ESC === "0xa2", "canSend is false");
         this.valid = this.valid &&
                      ensure(destTranche === this.participations[prevIndex].order.trancheB, "wrong dest tranche");
       }
@@ -445,7 +445,7 @@ export class Ring {
         const ERC1400token = this.context.ERC1400Contract.at(token);
         const tranferData = data ? data : "0x";
         const [ESC, unused, destTranche] = await ERC1400token.canSend(from, to, fromTranche, amount, tranferData);
-        assert(ESC === "0x01", "Cannot transfer ERC1400 tokens");
+        assert(ESC === "0xa0" || ESC === "0xa1" || ESC === "0xa2", "Cannot transfer ERC1400 tokens");
         transferItems.push({token, from, to, amount, tokenType,
                             fromTranche, toTranche: destTranche, data: tranferData});
       }
