@@ -1,3 +1,4 @@
+import assert = require("assert");
 import { BigNumber } from "bignumber.js";
 import BN = require("bn.js");
 import abi = require("ethereumjs-abi");
@@ -17,6 +18,8 @@ export class ExchangeDeserializer {
 
   private dataOffset: number = 0;
   private tableOffset: number = 0;
+
+  private zeroAddress = "0x" + "0".repeat(64);
 
   constructor(context: Context) {
     this.context = context;
@@ -118,11 +121,13 @@ export class ExchangeDeserializer {
       trancheB: this.nextBytes32(),
       transferDataS: this.nextBytes(),
     };
-    const zeroAddress = "0x" + "0".repeat(64);
-    order.feeToken = order.feeToken ? order.feeToken : this.context.lrcAddress;
+
+    if (this.context) {
+      order.feeToken = order.feeToken ? order.feeToken : this.context.lrcAddress;
+    }
     order.tokenRecipient = order.tokenRecipient ? order.tokenRecipient : order.owner;
-    order.trancheS = order.trancheS ? order.trancheS : zeroAddress;
-    order.trancheB = order.trancheB ? order.trancheB : zeroAddress;
+    order.trancheS = order.trancheS ? order.trancheS : this.zeroAddress;
+    order.trancheB = order.trancheB ? order.trancheB : this.zeroAddress;
     return order;
   }
 
