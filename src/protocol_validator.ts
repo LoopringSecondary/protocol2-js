@@ -109,9 +109,14 @@ export class ProtocolValidator {
                                                                     feeRecipient,
                                                                     feePayments);
 
+        let margin = (order.tokenTypeS !== TokenType.ERC1400) ? orderSettlement.splitS : new BigNumber(0);
+        if (order.tokenTypeS === TokenType.ERC1400) {
+          margin = new BigNumber(0);
+        }
+
         if (orderExpectation.margin !== undefined) {
           // Check if the margin is as expected
-          this.assertAlmostEqual(orderSettlement.splitS.toNumber(), orderExpectation.margin,
+          this.assertAlmostEqual(margin.toNumber(), orderExpectation.margin,
                                  "Margin does not match the expected value");
         }
 
@@ -129,7 +134,10 @@ export class ProtocolValidator {
 
         // Balances
 
-        const totalS = orderSettlement.amountS.minus(orderSettlement.rebateS);
+        let totalS = orderSettlement.amountS.minus(orderSettlement.rebateS);
+        if (order.tokenTypeS === TokenType.ERC1400) {
+          totalS = totalS.minus(orderSettlement.splitS);
+        }
         const totalB = orderSettlement.amountB.minus(orderSettlement.amountFeeB).plus(orderSettlement.rebateB);
         const totalFee = orderSettlement.amountFee.minus(orderSettlement.rebateFee);
         // console.log("totalS: " + totalS / 1e18);
@@ -272,6 +280,8 @@ export class ProtocolValidator {
                          .times(prevOrderExpectation.filledFraction.toString())
                          .floor();
       const splitS = amountS.minus(amountFeeS).minus(prevAmountB);
+      const epsilon = 10000;
+      assert(splitS.gte(-epsilon), "splitS >= 0");
 
       const orderSettlement: OrderSettlement = {
         amountS,

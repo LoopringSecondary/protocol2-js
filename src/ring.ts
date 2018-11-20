@@ -821,8 +821,11 @@ export class Ring {
     for (let i = 0; i < ringSize; i++) {
       const p = this.participations[i];
       const nextP = this.participations[(i + 1) % ringSize];
+
+      const margin = (p.order.tokenTypeS !== TokenType.ERC1400) ? p.splitS : new BigNumber(0);
+
       // Owner balances
-      const expectedBalanceS = p.fillAmountS.minus(p.rebateS).plus(p.splitS).negated();
+      const expectedBalanceS = p.fillAmountS.minus(p.rebateS).plus(margin).negated();
       const expectedBalanceB = p.fillAmountB.minus(p.feeAmountB.minus(p.rebateB));
       const expectedBalanceFeeToken = p.feeAmount.minus(p.rebateFee).negated();
 
@@ -830,7 +833,7 @@ export class Ring {
       expectedBalances.addBalance(p.order.owner, p.order.tokenS, p.order.trancheS, expectedBalanceS);
       expectedBalances.addBalance(p.order.tokenRecipient, p.order.tokenB, p.order.trancheB, expectedBalanceB);
       expectedBalances.addBalance(p.order.owner, p.order.feeToken, this.zeroAddress, expectedBalanceFeeToken);
-      expectedBalances.addBalance(mining.feeRecipient, p.order.tokenS, p.order.trancheS, p.splitS);
+      expectedBalances.addBalance(mining.feeRecipient, p.order.tokenS, p.order.trancheS, margin);
 
       // Accumulate fees
       expectedFeeBalances.addBalance(feeAddress, p.order.tokenS, p.order.trancheS, p.feeAmountS.minus(p.rebateS));
