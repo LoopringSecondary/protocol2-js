@@ -21,7 +21,7 @@ export class BalanceBook {
     }
   }
 
-  public addBalance(owner: string, token: string, tranche: string, amount: BigNumber) {
+  public setBalance(owner: string, token: string, tranche: string, amount: BigNumber) {
     assert(owner !== undefined);
     assert(token !== undefined);
     assert(tranche !== undefined);
@@ -31,9 +31,11 @@ export class BalanceBook {
     if (!this.balances[owner][token]) {
       this.balances[owner][token] = {};
     }
-    if (!this.balances[owner][token][tranche]) {
-      this.balances[owner][token][tranche] = new BigNumber(0);
-    }
+    this.balances[owner][token][tranche] = amount;
+  }
+
+  public addBalance(owner: string, token: string, tranche: string, amount: BigNumber) {
+    this.setBalance(owner, token, tranche, this.getBalance(owner, token, tranche));
     this.balances[owner][token][tranche] = this.balances[owner][token][tranche].plus(amount);
   }
 
