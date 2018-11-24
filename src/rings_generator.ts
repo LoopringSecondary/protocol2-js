@@ -137,24 +137,30 @@ export class RingsGenerator {
       if (!ownerTokens[order.owner]) {
         ownerTokens[order.owner] = {};
       }
-      if (!ownerTokens[order.owner][order.tokenS]) {
-        ownerTokens[order.owner][order.tokenS] = {};
+      if (!ownerTokens[order.owner][order.tokenTypeS]) {
+        ownerTokens[order.owner][order.tokenTypeS] = {};
       }
-      if (!ownerTokens[order.owner][order.tokenS][order.trancheS]) {
-        ownerTokens[order.owner][order.tokenS][order.trancheS] = {
+      if (!ownerTokens[order.owner][order.tokenTypeS][order.tokenS]) {
+        ownerTokens[order.owner][order.tokenTypeS][order.tokenS] = {};
+      }
+      if (!ownerTokens[order.owner][order.tokenTypeS][order.tokenS][order.trancheS]) {
+        ownerTokens[order.owner][order.tokenTypeS][order.tokenS][order.trancheS] = {
           index: numSpendables++,
         };
       }
-      order.tokenSpendableS = ownerTokens[order.owner][order.tokenS][order.trancheS];
-      if (!ownerTokens[order.owner][tokenFee]) {
-        ownerTokens[order.owner][tokenFee] = {};
+      order.tokenSpendableS = ownerTokens[order.owner][order.tokenTypeS][order.tokenS][order.trancheS];
+      if (!ownerTokens[order.owner][order.tokenTypeFee]) {
+        ownerTokens[order.owner][order.tokenTypeFee] = {};
       }
-      if (!ownerTokens[order.owner][tokenFee][this.zeroAddress]) {
-        ownerTokens[order.owner][tokenFee][this.zeroAddress] = {
+      if (!ownerTokens[order.owner][order.tokenTypeFee][tokenFee]) {
+        ownerTokens[order.owner][order.tokenTypeFee][tokenFee] = {};
+      }
+      if (!ownerTokens[order.owner][order.tokenTypeFee][tokenFee][this.zeroAddress]) {
+        ownerTokens[order.owner][order.tokenTypeFee][tokenFee][this.zeroAddress] = {
           index: numSpendables++,
         };
       }
-      order.tokenSpendableFee = ownerTokens[order.owner][tokenFee][this.zeroAddress];
+      order.tokenSpendableFee = ownerTokens[order.owner][order.tokenTypeFee][tokenFee][this.zeroAddress];
     }
     return numSpendables;
   }

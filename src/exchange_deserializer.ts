@@ -19,7 +19,7 @@ export class ExchangeDeserializer {
   private dataOffset: number = 0;
   private tableOffset: number = 0;
 
-  private zeroAddress = "0x" + "0".repeat(64);
+  private zeroBytes32 = "0x" + "0".repeat(64);
 
   constructor(context: Context) {
     this.context = context;
@@ -126,8 +126,9 @@ export class ExchangeDeserializer {
       order.feeToken = order.feeToken ? order.feeToken : this.context.lrcAddress;
     }
     order.tokenRecipient = order.tokenRecipient ? order.tokenRecipient : order.owner;
-    order.trancheS = order.trancheS ? order.trancheS : this.zeroAddress;
-    order.trancheB = order.trancheB ? order.trancheB : this.zeroAddress;
+    order.trancheS = order.trancheS ? order.trancheS : this.zeroBytes32;
+    order.trancheB = order.trancheB ? order.trancheB : this.zeroBytes32;
+    order.transferDataS = order.transferDataS ? order.transferDataS : "0x";
     return order;
   }
 
@@ -230,22 +231,32 @@ export class ExchangeDeserializer {
       if (!ownerSpendables[order.owner]) {
         ownerSpendables[order.owner] = {};
       }
-      if (!ownerSpendables[order.owner][order.tokenS]) {
-        ownerSpendables[order.owner][order.tokenS] = {};
+      if (!ownerSpendables[order.owner][order.tokenTypeS]) {
+        ownerSpendables[order.owner][order.tokenTypeS] = {};
       }
-      if (!ownerSpendables[order.owner][order.tokenS][order.trancheS]) {
-        ownerSpendables[order.owner][order.tokenS][order.trancheS] = order.tokenSpendableS;
+      if (!ownerSpendables[order.owner][order.tokenTypeS][order.tokenS]) {
+        ownerSpendables[order.owner][order.tokenTypeS][order.tokenS] = {};
       }
-      assert.equal(order.tokenSpendableS, ownerSpendables[order.owner][order.tokenS][order.trancheS],
-                   "Spendable for tokenS should match");
-      if (!ownerSpendables[order.owner][order.feeToken]) {
-        ownerSpendables[order.owner][order.feeToken] = {};
+      if (!ownerSpendables[order.owner][order.tokenTypeS][order.tokenS][order.trancheS]) {
+        ownerSpendables[order.owner][order.tokenTypeS][order.tokenS][order.trancheS] = order.tokenSpendableS;
       }
-      if (!ownerSpendables[order.owner][order.feeToken][zeroAddress]) {
-        ownerSpendables[order.owner][order.feeToken][zeroAddress] = order.tokenSpendableFee;
+      assert.equal(
+        order.tokenSpendableS, ownerSpendables[order.owner][order.tokenTypeS][order.tokenS][order.trancheS],
+        "Spendable for tokenS should match",
+      );
+      if (!ownerSpendables[order.owner][order.tokenTypeFee]) {
+        ownerSpendables[order.owner][order.tokenTypeFee] = {};
       }
-      assert.equal(order.tokenSpendableFee, ownerSpendables[order.owner][order.feeToken][zeroAddress],
-                   "Spendable for feeToken should match");
+      if (!ownerSpendables[order.owner][order.tokenTypeFee][order.feeToken]) {
+        ownerSpendables[order.owner][order.tokenTypeFee][order.feeToken] = {};
+      }
+      if (!ownerSpendables[order.owner][order.tokenTypeFee][order.feeToken][zeroAddress]) {
+        ownerSpendables[order.owner][order.tokenTypeFee][order.feeToken][zeroAddress] = order.tokenSpendableFee;
+      }
+      assert.equal(
+        order.tokenSpendableFee, ownerSpendables[order.owner][order.tokenTypeFee][order.feeToken][zeroAddress],
+        "Spendable for feeToken should match",
+      );
     }
   }
 }

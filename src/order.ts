@@ -12,6 +12,8 @@ export class OrderUtil {
 
   private context: Context;
 
+  private zeroBytes32 = "0x" + "0".repeat(64);
+
   constructor(context: Context) {
     this.context = context;
   }
@@ -50,6 +52,19 @@ export class OrderUtil {
     if (order.dualAuthAddr) {
       valid = valid && ensure(order.dualAuthSig && order.dualAuthSig.length > 0, "missing dual author signature");
     }
+
+    valid = valid && ensure(
+      !(order.tokenTypeS === TokenType.ERC20 && order.trancheS !== this.zeroBytes32),
+      "invalid trancheS",
+    );
+    valid = valid && ensure(
+      !(order.tokenTypeB === TokenType.ERC20 && order.trancheB !== this.zeroBytes32),
+      "invalid trancheB",
+    );
+    valid = valid && ensure(
+      !(order.tokenTypeS === TokenType.ERC20 && order.transferDataS !== "0x"),
+      "invalid transferDataS",
+    );
 
     const blockTimestamp = this.context.blockTimestamp;
     valid = valid && ensure(order.validSince <= blockTimestamp, "order is too early to match");

@@ -222,14 +222,22 @@ export class ProtocolSimulator {
       broker: string;
       owner: string;
       token: string;
+      tranche: string;
+      tokenType: TokenType;
       spendable: Spendable;
     }
 
+    const zeroTranche = "0x" + "0".repeat(64);
     const brokerSpendables: BrokerSpendable[] = [];
-    const addBrokerSpendable = (broker: string, owner: string, token: string) => {
+    const addBrokerSpendable = (broker: string, owner: string, token: string,
+                                tranche: string, tokenType: TokenType) => {
       // Find an existing one
       for (const spendable of brokerSpendables) {
-        if (spendable.broker === broker && spendable.owner === owner && spendable.token === token) {
+        if (spendable.broker === broker &&
+            spendable.owner === owner &&
+            spendable.token === token &&
+            spendable.tranche === tranche &&
+            spendable.tokenType === tokenType) {
           return spendable.spendable;
         }
       }
@@ -243,6 +251,8 @@ export class ProtocolSimulator {
         broker,
         owner,
         token,
+        tranche,
+        tokenType,
         spendable: newSpendable,
       };
       brokerSpendables.push(newBrokerSpendable);
@@ -251,8 +261,10 @@ export class ProtocolSimulator {
 
     for (const order of orders) {
       if (order.brokerInterceptor) {
-        order.brokerSpendableS = addBrokerSpendable(order.broker, order.owner, order.tokenS);
-        order.brokerSpendableFee = addBrokerSpendable(order.broker, order.owner, order.feeToken);
+        order.brokerSpendableS = addBrokerSpendable(order.broker, order.owner, order.tokenS,
+                                                    order.trancheS, order.tokenTypeS);
+        order.brokerSpendableFee = addBrokerSpendable(order.broker, order.owner, order.feeToken,
+                                                      zeroTranche, order.tokenTypeFee);
       }
     }
   }

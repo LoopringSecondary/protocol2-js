@@ -211,6 +211,7 @@ export class Ring {
       // No need to check the fee balance of the owner if feeToken == tokenB,
       // fillAmountB will be used to pay the fee.
       if (!(p.order.feeToken === p.order.tokenB &&
+            p.order.tokenTypeFee === p.order.tokenTypeB &&
             p.order.owner === p.order.tokenRecipient &&
             p.order.feeAmount <= p.order.amountB)) {
         // Check how much fee needs to be paid. We limit fillAmountS to how much
@@ -218,7 +219,9 @@ export class Ring {
         let feeAmount = new BigNumber(p.order.feeAmount).times(p.fillAmountS).dividedToIntegerBy(p.order.amountS);
         if (feeAmount.gt(0)) {
           const spendableFee = await this.orderUtil.getSpendableFee(p.order);
-          if (p.order.feeToken === p.order.tokenS && p.fillAmountS.add(feeAmount).gt(p.ringSpendableS)) {
+          if (p.order.feeToken === p.order.tokenS &&
+              p.order.tokenTypeFee === p.order.tokenTypeS &&
+              p.fillAmountS.add(feeAmount).gt(p.ringSpendableS)) {
             assert(spendableFee.eq(p.ringSpendableS), "spendableFee == spendableS when feeToken == tokenS");
             // Equally divide the available tokens between fillAmountS and feeAmount
             const totalAmount = new BigNumber(p.order.amountS).add(p.order.feeAmount);
@@ -251,6 +254,7 @@ export class Ring {
 
       // If feeToken == tokenB AND owner == tokenRecipient, try to pay using fillAmountB
       if (p.order.feeToken === p.order.tokenB &&
+          p.order.tokenTypeFee === p.order.tokenTypeB &&
           p.order.owner === p.order.tokenRecipient &&
           p.fillAmountB.gte(p.feeAmount)) {
         p.feeAmountB = p.feeAmount;
