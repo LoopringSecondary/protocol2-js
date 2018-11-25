@@ -15,6 +15,7 @@ export enum SignAlgorithm {
 export enum TokenType {
   ERC20 = 0,
   ERC1400 = 1,
+  COUNT = 2,
 }
 
 export interface Spendable {

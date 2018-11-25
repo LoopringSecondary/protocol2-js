@@ -66,6 +66,11 @@ export class OrderUtil {
       "invalid transferDataS",
     );
 
+    // This emulates the revert in solidity with invalid enum values
+    assert(order.tokenTypeS < TokenType.COUNT, "invalid opcode");
+    assert(order.tokenTypeB < TokenType.COUNT, "invalid opcode");
+    assert(order.tokenTypeFee < TokenType.COUNT, "invalid opcode");
+
     const blockTimestamp = this.context.blockTimestamp;
     valid = valid && ensure(order.validSince <= blockTimestamp, "order is too early to match");
     valid = valid && ensure(order.validUntil ? order.validUntil > blockTimestamp : true, "order is expired");
@@ -322,6 +327,8 @@ export class OrderUtil {
       return await this.getERC20Spendable(this.context.tradeDelegate.address, token, owner);
     } else if (tokenType === TokenType.ERC1400) {
       return await this.getERC1400Spendable(this.context.tradeDelegate.address, token, tranche, owner);
+    } else {
+      return new BigNumber(0);
     }
   }
 
