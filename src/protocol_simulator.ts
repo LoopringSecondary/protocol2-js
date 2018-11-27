@@ -205,7 +205,7 @@ export class ProtocolSimulator {
       bitstream.addNumber(0, 12);
     }
 
-    const fills = await this.context.tradeDelegate.batchGetFilledAndCheckCancelled(bitstream.getBytes32Array());
+    const fills = await this.context.tradeHistory.batchGetFilledAndCheckCancelled(bitstream.getBytes32Array());
 
     const cancelledValue = new BigNumber("F".repeat(64), 16);
     for (const [i, order] of orders.entries()) {
@@ -350,7 +350,7 @@ export class ProtocolSimulator {
     const filledAmountsBefore: { [hash: string]: BigNumber; } = {};
     for (const order of orders) {
       const orderHash = order.hash.toString("hex");
-      filledAmountsBefore[orderHash] = await this.context.tradeDelegate.filled("0x" + orderHash);
+      filledAmountsBefore[orderHash] = await this.context.tradeHistory.filled("0x" + orderHash);
     }
 
     // Filled amounts after

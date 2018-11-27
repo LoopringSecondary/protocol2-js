@@ -12,6 +12,7 @@ export class Context {
   public ERC20Contract: any;
   public ERC1400Contract: any;
   public TradeDelegateContract: any;
+  public TradeHistoryContract: any;
   public BrokerRegistryContract: any;
   public OrderRegistryContract: any;
   public BrokerInterceptorContract: any;
@@ -20,6 +21,7 @@ export class Context {
   public BurnRateTableContract: any;
 
   public tradeDelegate: any;
+  public tradeHistory: any;
   public orderBrokerRegistry: any;
   public minerBrokerRegistry: any;
   public orderRegistry: any;
@@ -31,6 +33,7 @@ export class Context {
   constructor(blockNumber: number,
               blockTimestamp: number,
               tradeDelegateAddress: string,
+              tradeHistoryAddress: string,
               orderBrokerRegistryAddress: string,
               orderRegistryAddress: string,
               feeHolderAddress: string,
@@ -49,6 +52,7 @@ export class Context {
     const erc20Abi = fs.readFileSync(ABIPath + "ERC20.abi", "ascii");
     const erc1400Abi = fs.readFileSync(ABIPath + "ERC1400.abi", "ascii");
     const tradeDelegateAbi = fs.readFileSync(ABIPath + "ITradeDelegate.abi", "ascii");
+    const tradeHistoryAbi = fs.readFileSync(ABIPath + "ITradeHistory.abi", "ascii");
     const brokerRegistryAbi = fs.readFileSync(ABIPath + "IBrokerRegistry.abi", "ascii");
     const orderRegistryAbi = fs.readFileSync(ABIPath + "IOrderRegistry.abi", "ascii");
     const brokerInterceptorAbi = fs.readFileSync(ABIPath + "IBrokerInterceptor.abi", "ascii");
@@ -63,6 +67,7 @@ export class Context {
     this.ERC20Contract = web3.eth.contract(JSON.parse(erc20Abi));
     this.ERC1400Contract = web3.eth.contract(JSON.parse(erc1400Abi));
     this.TradeDelegateContract = web3.eth.contract(JSON.parse(tradeDelegateAbi));
+    this.TradeHistoryContract = web3.eth.contract(JSON.parse(tradeHistoryAbi));
     this.BrokerRegistryContract = web3.eth.contract(JSON.parse(brokerRegistryAbi));
     this.OrderRegistryContract = web3.eth.contract(JSON.parse(orderRegistryAbi));
     this.FeeHolderContract = web3.eth.contract(JSON.parse(feeHolderAbi));
@@ -70,7 +75,8 @@ export class Context {
     this.BrokerInterceptorContract = web3.eth.contract(JSON.parse(brokerInterceptorAbi));
     this.BurnRateTableContract = web3.eth.contract(JSON.parse(burnRateTableAbi));
 
-    this.tradeDelegate = this.TradeDelegateContract.at(tradeDelegateAddress);
+    this.tradeDelegate = this.TradeHistoryContract.at(tradeDelegateAddress);
+    this.tradeHistory = this.TradeHistoryContract.at(tradeHistoryAddress);
     this.orderBrokerRegistry = this.BrokerRegistryContract.at(orderBrokerRegistryAddress);
     this.orderRegistry = this.OrderRegistryContract.at(orderRegistryAddress);
     this.feeHolder = this.FeeHolderContract.at(feeHolderAddress);

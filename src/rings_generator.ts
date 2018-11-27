@@ -323,6 +323,7 @@ export class RingsGenerator {
     } else {
       this.insertDefault(param);
     }
+
     if (order.trancheB && order.trancheB !== "0x0" && order.trancheB !== this.zeroAddress) {
       this.insertOffset(param, param.data.addHex(order.trancheB, false));
     } else {
