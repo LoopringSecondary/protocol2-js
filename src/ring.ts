@@ -169,6 +169,14 @@ export class Ring {
     for (let i = 0; i < ringSize; i++) {
       const prevIndex = (i + ringSize - 1) % ringSize;
 
+      // Check if we can transfer the tokens (if ST-20)
+      this.valid = this.valid && await this.verifyTransferProxy(
+          this.participations[i].order.tokenS,
+          this.participations[i].order.owner,
+          this.participations[prevIndex].order.tokenRecipient,
+          this.participations[i].fillAmountS,
+      );
+
       const valid = await this.calculateFees(this.participations[i], this.participations[prevIndex]);
       this.valid = this.valid && ensure(valid, "ring cannot be settled");
       if (this.participations[i].order.waiveFeePercentage < 0) {
@@ -181,6 +189,17 @@ export class Ring {
     // Ring calculations are done. Make sure te remove all reservations for this ring
     for (const p of this.participations) {
       this.orderUtil.resetReservations(p.order);
+    }
+  }
+
+  public async verifyTransferProxy(token: string, from: string, to: string, amount: BigNumber) {
+    try {
+      const Token = this.context.ERC20Contract;
+      Token.options.address = token;
+      const allowed = await Token.methods.verifyTransfer(from, to, 0).call();
+      return allowed;
+    } catch {
+      return true;
     }
   }
 
