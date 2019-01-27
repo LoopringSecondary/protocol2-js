@@ -196,7 +196,7 @@ export class Ring {
     try {
       const Token = this.context.ERC20Contract;
       Token.options.address = token;
-      const allowed = await Token.methods.verifyTransfer(from, to, 0).call();
+      const allowed = await Token.methods.verifyTransfer(from, to, 0, web3.utils.hexToBytes("0x")).call();
       return allowed;
     } catch {
       return true;
