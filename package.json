@@ -30,7 +30,8 @@
     "types-bn": "0.0.1",
     "typescript": "^2.8.3",
     "copyfiles": "^2.1.0",
-    "web3-typescript-typings": "^0.10.2"
+    "web3-typescript-typings": "^0.10.2",
+    "js-yaml": ">=3.13.1"
   },
   "dependencies": {
     "@types/browserify": "^12.0.33",
