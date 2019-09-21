@@ -55,22 +55,22 @@ export class OrderUtil {
     valid = valid && ensure(order.validUntil ? order.validUntil > blockTimestamp : true, "order is expired");
 
     // We only support ERC20 for now
-    valid = valid && ensure(
-      (order.tokenTypeS === TokenType.ERC20 && order.trancheS === this.zeroBytes32),
-      "invalid trancheS",
-    );
-    valid = valid && ensure(
-      (order.tokenTypeB === TokenType.ERC20 && order.trancheB === this.zeroBytes32),
-      "invalid trancheB",
-    );
+//     valid = valid && ensure(
+//       (order.tokenTypeS === TokenType.ERC20 && order.trancheS === this.zeroBytes32),
+//       "invalid trancheS",
+//     );
+//     valid = valid && ensure(
+//       (order.tokenTypeB === TokenType.ERC20 && order.trancheB === this.zeroBytes32),
+//       "invalid trancheB",
+//     );
     valid = valid && ensure(
       (order.tokenTypeFee === TokenType.ERC20),
       "invalid tokenTypeFee",
     );
-    valid = valid && ensure(
-      (order.tokenTypeS === TokenType.ERC20 && order.transferDataS === "0x"),
-      "invalid transferDataS",
-    );
+//     valid = valid && ensure(
+//       (order.tokenTypeS === TokenType.ERC20 && order.transferDataS === "0x"),
+//       "invalid transferDataS",
+//     );
     // This emulates the revert in solidity with invalid enum values
     assert(order.tokenTypeS < TokenType.COUNT, "invalid opcode");
     assert(order.tokenTypeB < TokenType.COUNT, "invalid opcode");
